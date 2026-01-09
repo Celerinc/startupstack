@@ -16,7 +16,7 @@ services:
   # -----------------
   plane-web:
     expose:
-      - "80"
+      - "3000"
 
   plane-api:
     expose:

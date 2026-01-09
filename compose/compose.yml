@@ -68,7 +68,7 @@ services:
   # (Optional but recommended for real usage)
   plane-worker:
     image: makeplane/plane-backend:${PLANE_VERSION}
-    command: ./bin/worker
+    command: ["/code/bin/docker-entrypoint-worker.sh"]
     environment:
       DATABASE_URL: postgres://plane:${PLANE_DB_PASSWORD}@plane-db:5432/plane
       REDIS_URL: redis://plane-redis:6379
@@ -96,7 +96,7 @@ services:
   # N8N
   # -----------------
   n8n:
-    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION}
+    image: n8nio/n8n:${N8N_VERSION}
     environment:
       N8N_HOST: ${N8N_HOST}
       N8N_PORT: 5678
@@ -150,6 +150,9 @@ services:
   # -----------------
   caddy:
     image: caddy:2.8.4
+    environment:
+      CADDY_BASIC_AUTH_USER: ${CADDY_BASIC_AUTH_USER}
+      CADDY_BASIC_AUTH_HASH: ${CADDY_BASIC_AUTH_HASH}
     networks: [edge, internal]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
