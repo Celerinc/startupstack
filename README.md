@@ -53,14 +53,15 @@ startupstack/
 ├── compose/
 │   ├── compose.yml           # base (shared, pinned images)
 │   ├── compose.local.yml     # local overrides (ports)
-│   └── compose.prod.yml      # prod overrides (HTTPS only)
+│   └── compose.prod.yml      # prod overrides (HTTPS + /data binds)
 ├── env/
 │   ├── .env.example          # documented variables (no secrets)
 │   ├── .env.local            # local values (gitignored)
 │   └── .env.prod             # production values (gitignored)
 ├── scripts/
 │   ├── up
-│   └── down
+│   ├── down
+│   └── setup                 # one-time VPS bootstrap
 ├── Caddyfile                 # TLS + routing (prod)
 ├── README.md
 ├── CONTRIBUTING.md
@@ -90,7 +91,7 @@ cp env/.env.example env/.env.prod
 
 ## Run locally (development)
 
-Local mode exposes ports directly on your machine.
+Local mode exposes ports directly on your machine (no Caddy needed).
 
 Start:
 ```bash
@@ -117,7 +118,7 @@ Production mode exposes **only ports 80/443** via Caddy.
 ### VPS initial setup (one-time)
 
 Before starting the stack on a fresh VPS, run the bootstrap script once.
-It installs Docker, Docker Compose v2, sets permissions, and prepares /data for persistence.
+It installs Docker, Docker Compose v2, sets permissions, and prepares `/data` for persistence.
 
 ```bash
 chmod +x scripts/setup-vps.sh
@@ -145,9 +146,56 @@ Stop:
 
 ---
 
+## Reverse proxy notes (Caddy)
+
+### Plane frontend port
+
+The Plane frontend container listens on **port 3000** internally (not 80).  
+So your Caddyfile should route to `plane-web:3000`:
+
+```caddy
+plane.<domain> {
+  reverse_proxy plane-web:3000
+}
+```
+
+### Plane worker command
+
+The backend image includes the worker entrypoint at:
+
+- `/code/bin/docker-entrypoint-worker.sh`
+
+So the worker service should use:
+
+```yaml
+command: ["/code/bin/docker-entrypoint-worker.sh"]
+```
+
+### Protecting endpoints
+
+A default Basic Auth in Caddy is recommended for anything internal (Plane, n8n, Rocket.Chat), especially while bringing the stack up.
+
+Example (using env vars from `.env.prod`):
+
+```caddy
+:443 {
+  basic_auth {
+    {$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}
+  }
+}
+```
+
+To generate a hash:
+
+```bash
+docker run --rm caddy:2.8.4 caddy hash-password --plaintext 'your-password'
+```
+
+---
+
 ## Persistence
 
-Persistent data is stored in Docker volumes:
+Persistent data is stored in Docker volumes (base compose):
 
 - PostgreSQL (Plane)
 - MinIO (uploads)
@@ -155,8 +203,9 @@ Persistent data is stored in Docker volumes:
 - MongoDB (Rocket.Chat)
 - Caddy certificates
 
-On a VPS, volumes should be bound to a persistent disk
-(e.g. `/data`) via `compose.prod.yml`.
+On a VPS, volumes are bound to a persistent disk (e.g. `/data`) via `compose.prod.yml`.
+
+> Note: n8n runs as a non‑root user. On a VPS, ensure `/data/n8n` is writable by UID/GID `1000:1000` (handled by `setup-vps.sh`).
 
 ---
 
