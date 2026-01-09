@@ -35,10 +35,36 @@ sudo mkdir -p \
   /data/caddy/data \
   /data/caddy/config
 
-# 5. Permissions
+# 5. Permissions (per service)
 echo "Fixing permissions..."
-sudo chown -R "$USER":docker /data
-sudo chmod -R 750 /data
+
+# Keep /data owned by root
+sudo chown root:root /data
+sudo chmod 755 /data
+
+# Plane Postgres (postgres image runs as uid 999 in many distros; safe approach is to chown to 999)
+sudo chown -R 999:999 /data/plane/postgres
+sudo chmod -R 700 /data/plane/postgres
+
+# MinIO (default user in container is usually root; but safest is allowing write)
+sudo chown -R root:root /data/plane/minio
+sudo chmod -R 775 /data/plane/minio
+
+# n8n runs as node (uid 1000)
+sudo chown -R 1000:1000 /data/n8n
+sudo chmod -R 775 /data/n8n
+
+# Rocket.Chat Mongo (mongo runs as uid 999 in many images)
+sudo chown -R 999:999 /data/rocketchat/mongo
+sudo chmod -R 700 /data/rocketchat/mongo
+
+# Rocket.Chat uploads (rocket.chat container often runs as root, but uploads must be writable)
+sudo chown -R root:root /data/rocketchat/uploads
+sudo chmod -R 775 /data/rocketchat/uploads
+
+# Caddy (runs as uid/gid 1000 in the official image)
+sudo chown -R 1000:1000 /data/caddy
+sudo chmod -R 775 /data/caddy
 
 echo "== VPS setup complete =="
 echo "Next steps:"

@@ -1,23 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-local}"
-PROFILE="${2:-}" # optional: analytics
+MODE="${1:-local}"          # local | prod
+PROFILE="${2:-}"            # optional: analytics
 
 BASE="-f compose/compose.yml"
 LOCAL="-f compose/compose.local.yml"
 PROD="-f compose/compose.prod.yml"
 
 PROFILE_FLAG=""
-if [ "${PROFILE}" = "analytics" ]; then
+if [ "$PROFILE" = "analytics" ]; then
   PROFILE_FLAG="--profile analytics"
 fi
+
+echo "⏹️  Stopping StartupStack"
+echo "   Mode: $MODE ${PROFILE:+(profile: $PROFILE)}"
 
 if [ "$MODE" = "local" ]; then
   docker compose $BASE $LOCAL $PROFILE_FLAG down
 elif [ "$MODE" = "prod" ]; then
+  echo "⚠️  PROD shutdown"
   docker compose $BASE $PROD $PROFILE_FLAG down
 else
+  echo "❌ Invalid mode: $MODE"
   echo "Usage: ./scripts/down [local|prod] [analytics]"
   exit 1
 fi
+
+echo "✅ StartupStack stopped"
