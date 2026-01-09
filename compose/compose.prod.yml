@@ -1,0 +1,32 @@
+services:
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+
+  plane-web:
+    expose:
+      - "80"
+
+  n8n:
+    expose:
+      - "5678"
+
+  rocketchat:
+    expose:
+      - "3000"
+
+  plane-api:
+    expose:
+      - "8000"
+
+  plane-minio:
+    expose:
+      - "9000"
+      - "9001"
+
+  # ClickHouse later (if you uncomment service)
+  # clickhouse:
+  #   expose:
+  #     - "8123"
+  #     - "9000"

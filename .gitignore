@@ -1,0 +1,49 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets
+env/.env.local
+env/.env.prod
+.env
+*.pem
+*.key
+
+# Local data (if you ever mount ./data locally)
+data/
+./data/
+
+# Docker
+**/.docker/
+**/docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+tmp/
+
+# Node / Python (if you later add tooling)
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+
+# Terraform (if you keep it in the repo later)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Mac SSH artifacts (just in case)
+known_hosts
+known_hosts.old
+
+# Future updates
+tf/
+./tf/

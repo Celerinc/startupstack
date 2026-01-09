@@ -1,0 +1,31 @@
+{
+  email contact@celerinc.com
+}
+
+# -------------------------
+# Plane
+# -------------------------
+plane.celerinc.cloud {
+  reverse_proxy plane-web:80
+}
+
+# -------------------------
+# n8n
+# -------------------------
+n8n.celerinc.cloud {
+  reverse_proxy n8n:5678
+}
+
+# -------------------------
+# Rocket.Chat
+# -------------------------
+chat.celerinc.cloud {
+  reverse_proxy rocketchat:3000
+}
+
+# -------------------------
+# ClickHouse (later)
+# -------------------------
+# ch.celerinc.cloud {
+#   reverse_proxy clickhouse:8123
+# }

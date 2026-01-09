@@ -1,0 +1,31 @@
+services:
+  plane-web:
+    ports:
+      - "8080:80"
+
+  plane-api:
+    ports:
+      - "8081:8000"
+
+  plane-minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  n8n:
+    ports:
+      - "5678:5678"
+
+  rocketchat:
+    ports:
+      - "3000:3000"
+
+  # Optional for local testing
+  # clickhouse:
+  #   ports:
+  #     - "8123:8123"
+  #     - "9009:9000"
+
+  # In local, you can disable caddy entirely if you want:
+  caddy:
+    profiles: ["prodonly"]
