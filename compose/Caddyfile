@@ -2,17 +2,26 @@
   email contact@celerinc.com
 }
 
+# Default: protect everything on this server
+(auth) {
+  basic_auth {
+    {$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}
+  }
+}
+
 # -------------------------
 # Plane
 # -------------------------
 plane.celerinc.cloud {
-  reverse_proxy plane-web:80
+  import auth
+  reverse_proxy plane-web:3000
 }
 
 # -------------------------
 # n8n
 # -------------------------
 n8n.celerinc.cloud {
+  import auth
   reverse_proxy n8n:5678
 }
 
@@ -20,6 +29,7 @@ n8n.celerinc.cloud {
 # Rocket.Chat
 # -------------------------
 chat.celerinc.cloud {
+  import auth
   reverse_proxy rocketchat:3000
 }
 
@@ -27,5 +37,6 @@ chat.celerinc.cloud {
 # ClickHouse (later)
 # -------------------------
 # ch.celerinc.cloud {
+#   import auth
 #   reverse_proxy clickhouse:8123
 # }
