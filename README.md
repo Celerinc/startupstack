@@ -114,6 +114,20 @@ Stop:
 
 Production mode exposes **only ports 80/443** via Caddy.
 
+### VPS initial setup (one-time)
+
+Before starting the stack on a fresh VPS, run the bootstrap script once.
+It installs Docker, Docker Compose v2, sets permissions, and prepares /data for persistence.
+
+```bash
+chmod +x scripts/setup-vps.sh
+./scripts/setup-vps.sh
+```
+
+If the script adds your user to the docker group, log out and back in before continuing.
+
+### Run in production (VPS)
+
 Start:
 ```bash
 ./scripts/up prod

@@ -1,32 +1,66 @@
 services:
+  # -----------------
+  # EDGE (public)
+  # -----------------
   caddy:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/caddy/data:/data
+      - /data/caddy/config:/config
 
+  # -----------------
+  # PLANE
+  # -----------------
   plane-web:
     expose:
       - "80"
-
-  n8n:
-    expose:
-      - "5678"
-
-  rocketchat:
-    expose:
-      - "3000"
 
   plane-api:
     expose:
       - "8000"
 
+  plane-db:
+    volumes:
+      - /data/plane/postgres:/var/lib/postgresql/data
+
   plane-minio:
     expose:
       - "9000"
       - "9001"
+    volumes:
+      - /data/plane/minio:/data
 
-  # ClickHouse later (if you uncomment service)
+  # -----------------
+  # N8N
+  # -----------------
+  n8n:
+    expose:
+      - "5678"
+    volumes:
+      - /data/n8n:/home/node/.n8n
+
+  # -----------------
+  # ROCKET.CHAT
+  # -----------------
+  rocketchat:
+    expose:
+      - "3000"
+    volumes:
+      - /data/rocketchat/uploads:/app/uploads
+
+  rocketchat-mongo:
+    volumes:
+      - /data/rocketchat/mongo:/data/db
+
+  # -----------------
+  # CLICKHOUSE (later)
+  # -----------------
   # clickhouse:
   #   expose:
   #     - "8123"
   #     - "9000"
+  #   volumes:
+  #     - /data/clickhouse:/var/lib/clickhouse

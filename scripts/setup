@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "== StartupStack VPS setup =="
+
+# 1. Ensure Docker is available
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker not found. Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+fi
+
+# 2. Ensure docker compose v2 is available
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose v2 not found. Installing..."
+  mkdir -p ~/.docker/cli-plugins
+  curl -SL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
+    -o ~/.docker/cli-plugins/docker-compose
+  chmod +x ~/.docker/cli-plugins/docker-compose
+fi
+
+# 3. Ensure user is in docker group
+if ! groups | grep -q docker; then
+  echo "Adding user to docker group (logout/login required)"
+  sudo usermod -aG docker "$USER"
+fi
+
+# 4. Create persistent data directories
+echo "Creating /data directories..."
+sudo mkdir -p \
+  /data/plane/postgres \
+  /data/plane/minio \
+  /data/n8n \
+  /data/rocketchat/mongo \
+  /data/rocketchat/uploads \
+  /data/caddy/data \
+  /data/caddy/config
+
+# 5. Permissions
+echo "Fixing permissions..."
+sudo chown -R "$USER":docker /data
+sudo chmod -R 750 /data
+
+echo "== VPS setup complete =="
+echo "Next steps:"
+echo "1) Create env/.env.prod"
+echo "2) Review compose/compose.prod.yml"
+echo "3) Run: ./scripts/up prod"
