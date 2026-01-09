@@ -171,26 +171,6 @@ So the worker service should use:
 command: ["/code/bin/docker-entrypoint-worker.sh"]
 ```
 
-### Protecting endpoints
-
-A default Basic Auth in Caddy is recommended for anything internal (Plane, n8n, Rocket.Chat), especially while bringing the stack up.
-
-Example (using env vars from `.env.prod`):
-
-```caddy
-:443 {
-  basic_auth {
-    {$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}
-  }
-}
-```
-
-To generate a hash:
-
-```bash
-docker run --rm caddy:2.8.4 caddy hash-password --plaintext 'your-password'
-```
-
 ---
 
 ## Persistence

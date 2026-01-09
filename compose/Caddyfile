@@ -6,25 +6,21 @@
 # Plane
 # -------------------------
 plane.celerinc.cloud {
-
-  # Backend routes (must go to plane-api)
-  handle_path /api/* {
+  # API / auth / graphql must go to backend
+  handle /api/* {
+    reverse_proxy plane-api:8000
+  }
+  handle /auth/* {
+    reverse_proxy plane-api:8000
+  }
+  handle /graphql/* {
+    reverse_proxy plane-api:8000
+  }
+  handle /admin/* {
     reverse_proxy plane-api:8000
   }
 
-  handle_path /auth/* {
-    reverse_proxy plane-api:8000
-  }
-
-  handle_path /graphql/* {
-    reverse_proxy plane-api:8000
-  }
-
-  handle_path /admin/* {
-    reverse_proxy plane-api:8000
-  }
-
-  # Frontend (everything else)
+  # Everything else -> frontend
   handle {
     reverse_proxy plane-web:3000
   }
