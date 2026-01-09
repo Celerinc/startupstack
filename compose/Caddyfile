@@ -6,6 +6,9 @@
 # Plane
 # -------------------------
 plane.celerinc.cloud {
+  @api path /api/* /auth/* /graphql* /ws/*
+  
+  reverse_proxy @api plane-api:8000
   reverse_proxy plane-web:3000
 }
 
