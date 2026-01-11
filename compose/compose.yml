@@ -55,6 +55,8 @@ services:
     environment:
       DATABASE_URL: postgres://plane:${PLANE_DB_PASSWORD}@plane-db:5432/plane
       REDIS_URL: redis://plane-redis:6379
+      CELERY_BROKER_URL: redis://plane-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://plane-redis:6379/0
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
