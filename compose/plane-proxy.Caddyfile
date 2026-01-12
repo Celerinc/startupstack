@@ -1,0 +1,12 @@
+{
+  auto_https off
+}
+
+:80 {
+  reverse_proxy /api/* plane-api:8000
+  reverse_proxy /auth/* plane-api:8000
+  reverse_proxy /graphql/* plane-api:8000
+  reverse_proxy /god-mode/* plane-admin:3000
+  reverse_proxy /spaces/* plane-space:3000
+  reverse_proxy /* plane-web:3000
+}

@@ -21,6 +21,18 @@ volumes:
 
 services:
   # -----------------
+  # EDGE PROXY (Caddy)
+  # -----------------
+  caddy:
+    image: caddy:2.8.4
+    networks: [edge, internal]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+  # -----------------
   # PLANE
   # -----------------
   plane-db:
@@ -50,6 +62,18 @@ services:
     networks: [internal]
     restart: unless-stopped
 
+  plane-proxy:
+    image: makeplane/plane-proxy:${PLANE_VERSION}
+    volumes:
+      - ./plane-proxy.Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - plane-web
+      - plane-admin
+      - plane-space
+      - plane-api
+    networks: [internal]
+    restart: unless-stopped
+
   plane-api:
     image: makeplane/plane-backend:${PLANE_VERSION}
     environment:
@@ -61,12 +85,21 @@ services:
       PLANE_BUCKET: ${PLANE_BUCKET}
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+      AWS_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL}
       AWS_STORAGE_BUCKET_NAME: ${PLANE_BUCKET}
       AWS_S3_BUCKET_NAME: ${PLANE_BUCKET}
       AWS_S3_REGION_NAME: us-east-1
       WEB_URL: ${PLANE_WEB_URL}
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS}
+      APP_BASE_URL: ${PLANE_APP_BASE_URL}
+      ADMIN_BASE_URL: ${PLANE_ADMIN_BASE_URL}
+      SPACE_BASE_URL: ${PLANE_SPACE_BASE_URL}
+      GUNICORN_WORKERS: ${PLANE_GUNICORN_WORKERS}
+      ENABLE_SIGNUP: ${PLANE_ENABLE_SIGNUP}
+      ENABLE_EMAIL_PASSWORD: ${PLANE_ENABLE_EMAIL_PASSWORD}
+      DISABLE_WORKSPACE_CREATION: ${PLANE_DISABLE_WORKSPACE_CREATION}
+      CSRF_TRUSTED_ORIGINS: ${PLANE_WEB_URL}
+      CORS_ALLOWED_ORIGINS: ${PLANE_WEB_URL}
+      SECURE_PROXY_SSL_HEADER: HTTP_X_FORWARDED_PROTO,https
     depends_on: [plane-db, plane-redis, plane-minio]
     networks: [internal]
     restart: unless-stopped
@@ -87,7 +120,10 @@ services:
       AWS_S3_BUCKET_NAME: ${PLANE_BUCKET}
       AWS_S3_REGION_NAME: us-east-1
       WEB_URL: ${PLANE_WEB_URL}
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS}
+      APP_BASE_URL: ${PLANE_APP_BASE_URL}
+      ADMIN_BASE_URL: ${PLANE_ADMIN_BASE_URL}
+      SPACE_BASE_URL: ${PLANE_SPACE_BASE_URL}
+      GUNICORN_WORKERS: ${PLANE_GUNICORN_WORKERS}
     depends_on: [plane-api]
     networks: [internal]
     restart: unless-stopped
@@ -98,7 +134,49 @@ services:
     image: makeplane/plane-frontend:${PLANE_VERSION}
     environment:
       WEB_URL: ${PLANE_WEB_URL}
+      APP_BASE_URL: ${PLANE_APP_BASE_URL}
+      ADMIN_BASE_URL: ${PLANE_ADMIN_BASE_URL}
+      SPACE_BASE_URL: ${PLANE_SPACE_BASE_URL}
+      NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
+      NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL}
+      NEXT_PUBLIC_ADMIN_BASE_URL: ${NEXT_PUBLIC_ADMIN_BASE_URL}
+      NEXT_PUBLIC_SPACE_BASE_URL: ${NEXT_PUBLIC_SPACE_BASE_URL}
     depends_on: [plane-api]
+    networks: [internal]
+    restart: unless-stopped
+
+  plane-admin:
+    image: makeplane/plane-admin:${PLANE_VERSION}
+    environment:
+      WEB_URL: ${PLANE_WEB_URL}
+      APP_BASE_URL: ${PLANE_APP_BASE_URL}
+      ADMIN_BASE_URL: ${PLANE_ADMIN_BASE_URL}
+      SPACE_BASE_URL: ${PLANE_SPACE_BASE_URL}
+      NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
+      NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL}
+      NEXT_PUBLIC_ADMIN_BASE_URL: ${NEXT_PUBLIC_ADMIN_BASE_URL}
+      NEXT_PUBLIC_SPACE_BASE_URL: ${NEXT_PUBLIC_SPACE_BASE_URL}
+    depends_on: [plane-api, plane-web]
+    networks: [internal]
+    restart: unless-stopped
+
+  plane-space:
+    image: makeplane/plane-space:${PLANE_VERSION}
+    environment:
+      WEB_URL: ${PLANE_WEB_URL}
+      APP_BASE_URL: ${PLANE_APP_BASE_URL}
+      ADMIN_BASE_URL: ${PLANE_ADMIN_BASE_URL}
+      SPACE_BASE_URL: ${PLANE_SPACE_BASE_URL}
+      NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
+      NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL}
+      NEXT_PUBLIC_ADMIN_BASE_URL: ${NEXT_PUBLIC_ADMIN_BASE_URL}
+      NEXT_PUBLIC_SPACE_BASE_URL: ${NEXT_PUBLIC_SPACE_BASE_URL}
+    depends_on: [plane-api, plane-worker, plane-web]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/spaces/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
     networks: [internal]
     restart: unless-stopped
 
@@ -150,21 +228,10 @@ services:
       MONGO_OPLOG_URL: mongodb://rocketchat-mongo:27017/local?replicaSet=rs0
       ROOT_URL: ${ROCKETCHAT_ROOT_URL}
       PORT: 3000
+      OVERWRITE_SETTING_Accounts_RegistrationForm: "Disabled"
     volumes:
       - rocketchat_uploads:/app/uploads
     networks: [internal]
-    restart: unless-stopped
-
-  # -----------------
-  # EDGE PROXY (Caddy)
-  # -----------------
-  caddy:
-    image: caddy:2.8.4
-    networks: [edge, internal]
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
     restart: unless-stopped
 
   # -----------------
