@@ -42,32 +42,109 @@ echo "Fixing permissions..."
 sudo chown root:root /data
 sudo chmod 755 /data
 
-# Plane Postgres (postgres image runs as uid 999 in many distros; safe approach is to chown to 999)
+# Plane Postgres
 sudo chown -R 999:999 /data/plane/postgres
 sudo chmod -R 700 /data/plane/postgres
 
-# MinIO (default user in container is usually root; but safest is allowing write)
+# MinIO
 sudo chown -R root:root /data/plane/minio
 sudo chmod -R 775 /data/plane/minio
 
-# n8n runs as node (uid 1000)
+# n8n
 sudo chown -R 1000:1000 /data/n8n
 sudo chmod -R 775 /data/n8n
 
-# Rocket.Chat Mongo (mongo runs as uid 999 in many images)
+# Rocket.Chat Mongo
 sudo chown -R 999:999 /data/rocketchat/mongo
 sudo chmod -R 700 /data/rocketchat/mongo
 
-# Rocket.Chat uploads (rocket.chat container often runs as root, but uploads must be writable)
+# Rocket.Chat uploads
 sudo chown -R root:root /data/rocketchat/uploads
 sudo chmod -R 775 /data/rocketchat/uploads
 
-# Caddy (runs as uid/gid 1000 in the official image)
+# Caddy
 sudo chown -R 1000:1000 /data/caddy
 sudo chmod -R 775 /data/caddy
 
+# 6. Make scripts executable
+echo "Making scripts executable..."
+chmod +x \
+  scripts/up \
+  scripts/down \
+  scripts/bootstrap \
+  scripts/vpn-keygen \
+  scripts/firewall-lockdown \
+  scripts/firewall-rules \
+  scripts/join-tailnet
+
+# 7. Basic firewall bootstrap: delegate to firewall-rules
+echo "Configuring firewall via scripts/firewall-rules..."
+sudo ./scripts/firewall-rules
+
+# 8. Configuration Helper
+echo ""
+echo "== Configuration Helper =="
+ENV="${1:-prod}" # Default to prod if no argument provided
+TARGET_ENV="env/.env.${ENV}"
+
+if [ -t 0 ]; then
+  read -p "Enter your base domain (e.g. example.com): " DOMAIN
+  read -p "Enter your email for Let's Encrypt: " EMAIL
+else
+  echo "Non-interactive mode detected. Skipping configuration generation."
+  DOMAIN=""
+fi
+
+# Source helper functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/utils" ]; then
+  source "${SCRIPT_DIR}/utils"
+else
+  echo "Error: scripts/utils not found."
+  exit 1
+fi
+
+if [ -n "$DOMAIN" ]; then
+  # Generate target .env file
+  if [ ! -f "$TARGET_ENV" ]; then
+    echo "Generating $TARGET_ENV for $DOMAIN..."
+    cp env/.env.example "$TARGET_ENV"
+    
+    # Update DOMAIN and EMAIL
+    sedi "s/DOMAIN=example.com/DOMAIN=$DOMAIN/g" "$TARGET_ENV"
+    if [ -n "$EMAIL" ]; then
+      sedi "s/EMAIL=admin@example.com/EMAIL=$EMAIL/g" "$TARGET_ENV"
+    fi
+
+    # Randomize secrets
+    sedi "s/change-me/$(openssl rand -hex 16)/g" "$TARGET_ENV"
+    sedi "s/changeme/$(openssl rand -hex 16)/g" "$TARGET_ENV"
+  else
+    echo "$TARGET_ENV already exists. Skipping."
+  fi
+
+  # Generate Headscale config
+  if [ ! -f compose/headscale/config.yaml ]; then
+    echo "Generating compose/headscale/config.yaml for $DOMAIN..."
+    cp compose/headscale/config.example.yaml compose/headscale/config.yaml
+    
+    # Extract "example" from "example.com" or "sub.example.com" -> "example"
+    # Simple extraction of the first part before the first dot
+    BASE_NAME=$(echo "$DOMAIN" | cut -d. -f1)
+    
+    sedi "s/example.com/$DOMAIN/g" compose/headscale/config.yaml
+    sedi "s/example.internal/${BASE_NAME}.internal/g" compose/headscale/config.yaml
+  else
+    echo "compose/headscale/config.yaml already exists. Skipping."
+  fi
+fi
+
 echo "== VPS setup complete =="
 echo "Next steps:"
-echo "1) Create env/.env.prod"
-echo "2) Review compose/compose.prod.yml"
-echo "3) Run: ./scripts/up prod"
+echo "1) Review $TARGET_ENV"
+echo "2) Review compose/compose.${ENV}.yml"
+echo "3) Run: ./scripts/up $ENV"
+echo "4) Run: ./scripts/bootstrap         # creates Headscale user 'ssuser', DNS extras, etc."
+echo "5) Run: ./scripts/join-tailnet      # join VPS itself to tailnet"
+echo "6) Run: ./scripts/vpn-keygen <name>       # generate key for your Mac"
+echo "7) (Optional) Run: ./scripts/firewall-lockdown  # if you ever changed Docker iptables"

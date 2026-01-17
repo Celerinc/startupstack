@@ -1,11 +1,9 @@
 services:
-  plane-web:
+  # Use the internal proxy to route /api, /god-mode, /spaces, and / (web)
+  # This mimics production routing on a single port.
+  plane-proxy:
     ports:
-      - "8080:3000"
-
-  plane-api:
-    ports:
-      - "8081:8000"
+      - "8080:80"
 
   plane-minio:
     ports:
@@ -20,12 +18,11 @@ services:
     ports:
       - "3000:3000"
 
-  # Optional for local testing
-  # clickhouse:
+  # Optional: Expose Headplane UI locally for inspection
+  # headplane:
   #   ports:
-  #     - "8123:8123"
-  #     - "9009:9000"
+  #     - "3001:3000"
 
-  # In local, you can disable caddy entirely if you want:
+  # Disable the Edge Caddy in local (we access services directly via ports above)
   caddy:
     profiles: ["prodonly"]

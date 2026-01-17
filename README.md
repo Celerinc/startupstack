@@ -1,261 +1,190 @@
 # StartupStack
 
-Production‑grade **internal company stack** designed to run **locally and in production** using the **same Docker Compose setup**, with environment‑specific overrides.
+[![Docker](https://img.shields.io/badge/Docker-2CA5E0?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Tailscale](https://img.shields.io/badge/Tailscale-1e1e1e?logo=tailscale&logoColor=white)](https://tailscale.com/)
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)](https://ubuntu.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENCE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-This repository is **infra‑only** (Docker Compose + config).  
-It does **not** vendor or fork upstream application source code.
 
----
+**Production‑grade internal company stack** designed to run **locally and in production** using a unified Docker Compose architecture with Headscale/Tailscale VPN access control.
 
-## What’s inside (mandatory)
-
-- **Plane** — project & issue management  
-- **n8n (v2)** — automation / workflow engine  
-- **Rocket.Chat** — internal chat (channels, DMs, bots)  
-- **PostgreSQL** — Plane database  
-- **Redis** — Plane cache / queues  
-- **MinIO** — S3‑compatible object storage (Plane uploads)  
-- **MongoDB** — Rocket.Chat database (single‑node replica set)  
-- **Caddy** — reverse proxy + automatic HTTPS (production)
-
-### Optional (provided but disabled)
-- **ClickHouse** — analytics / large‑scale aggregations (commented out)
+StartupStack bundles a curated set of foundational tools used inside modern early‑stage companies, configured to work seamlessly together with minimal configuration drift between development and production.
 
 ---
 
-## Philosophy
+## 🚀 Features & Services
 
-- **One stack definition**
-- **Same behavior locally and in production**
-- Differences handled only by:
-  - environment files
-  - compose override files
-- No “works on my machine” drift
-- All images **pinned** (no `latest`)
+This repository provides **infrastructure-only** (Docker Compose + Config). It orchestrates the following services:
 
----
+| Service | Purpose | Database / Storage |
+| :--- | :--- | :--- |
+| **Plane** | Project & Issue Management | PostgreSQL, Redis, MinIO |
+| **n8n** | Automations & Workflow Automation | SQLite (default) or Postgres |
+| **Rocket.Chat** | Internal Team Chat | MongoDB |
+| **Headscale** | Private Mesh VPN Controller | SQLite / Embedded |
+| **Headplane** | Web UI for Headscale | - |
+| **MinIO** | S3-compatible Object Storage | Filesystem |
+| **Caddy** | Reverse Proxy & Auto-TLS | - |
 
-## Prerequisites
-
-- Docker Desktop (Mac) or Docker Engine (Linux / VPS)
-- Docker Compose v2 (`docker compose`)
-- (Production) DNS `A` records pointing to the server:
-  - `plane.<domain>`
-  - `n8n.<domain>`
-  - `chat.<domain>`
+> **Philosophy**: One stack. Same manifests. Different env values. No Kubernetes. No Helm. No Terraform. No VM drift.
 
 ---
 
-## Repository structure
+## 🏗 Architecture
 
+### Network Flow
+
+```mermaid
+graph TD
+    User[User Device] -->|Tailscale VPN| VPS[VPS Public IP]
+    VPS -->|Port 443| Caddy[Caddy Reverse Proxy]
+    
+    subgraph "Internal Docker Network"
+        Caddy -->|Proxy| Plane
+        Caddy -->|Proxy| n8n
+        Caddy -->|Proxy| Chat[Rocket.Chat]
+        Caddy -->|Proxy| Headplane
+        
+        Plane -.-> Postgres
+        Plane -.-> Redis
+        Plane -.-> MinIO
+        Chat -.-> Mongo[MongoDB]
+    end
+    
+    subgraph "VPN Control Plane"
+        Headscale[Headscale Controller]
+    end
+    
+    User -.->|Auth| Headscale
 ```
+
+### Security Model
+1.  **Public Exposure**: Only **Headscale** (VPN Controller) is exposed to the public internet on port 443.
+2.  **Private Access**: All applications (Plane, n8n, Rocket.Chat) are hidden behind the VPN. They are **not** accessible via public IP.
+3.  **Authentication**: Access is enforced by membership in the Tailnet. If you are not connected to the VPN, you cannot reach the services.
+
+---
+
+## 📂 Repository Structure
+
+```text
 startupstack/
-├── compose/
-│   ├── compose.yml           # base (shared, pinned images)
-│   ├── compose.local.yml     # local overrides (ports)
-│   └── compose.prod.yml      # prod overrides (HTTPS + /data binds)
-├── env/
-│   ├── .env.example          # documented variables (no secrets)
-│   ├── .env.local            # local values (gitignored)
-│   └── .env.prod             # production values (gitignored)
-├── scripts/
-│   ├── up
-│   ├── down
-│   └── setup                 # one-time VPS bootstrap
-├── Caddyfile                 # TLS + routing (prod)
-├── README.md
-├── CONTRIBUTING.md
-└── LICENSE
+├── compose/                # Docker Compose definitions (Modular)
+│   ├── compose.yml         # Base shared services (Networks, Images, Volumes)
+│   ├── compose.local.yml   # Overrides for specific ports in Local dev
+│   └── compose.prod.yml    # Overrides for Volume paths & Exposure in Prod
+├── env/                    # Environment Variables
+│   ├── .env.example        # Template for all required vars
+│   ├── .env.local          # Local development secrets
+│   └── .env.prod           # Production secrets (GitIgnored)
+├── scripts/                # Automation utilities
+│   ├── setup               # VPS provisioning (Docker, Dirs, Perms)
+│   ├── up                  # Universal start command (Local/Prod)
+│   ├── bootstrap           # Initialize Headscale & DNS
+│   ├── join-tailnet        # Connect VPS to the Tailnet
+│   └── vpn-keygen          # Generate auth keys for user devices
+└── docs/                   # Detailed documentation
 ```
 
 ---
 
-## Environment configuration
+## ⚡️ Quick Start: Local Development
 
-All configuration is done through env files.
+Run the entire full-stack locally with port forwarding.
 
-- `env/.env.local` → local development
-- `env/.env.prod` → production (VPS)
-
-Same keys, different values.
-
-**Never commit secrets.**
-
-Use the example file to bootstrap:
-```bash
-cp env/.env.example env/.env.local
-cp env/.env.example env/.env.prod
-```
-
----
-
-## Run locally (development)
-
-Local mode exposes ports directly on your machine (no Caddy needed).
-
-Start:
-```bash
-./scripts/up local
-```
-
-Services:
-- Plane: http://localhost:8080
-- n8n: http://localhost:5678
-- Rocket.Chat: http://localhost:3000
-- MinIO console: http://localhost:9001
-
-Stop:
-```bash
-./scripts/down local
-```
+1.  **Prerequisites**: Install Docker & Docker Compose.
+2.  **Configure Environment**:
+    ```bash
+    cp env/.env.example env/.env.local
+    # Edit env/.env.local if needed (defaults usually work for local)
+    ```
+3.  **Start Services**:
+    ```bash
+    ./scripts/up local
+    ```
+4.  **Access Services**:
+    - **Plane**: http://localhost:8080
+    - **n8n**: http://localhost:5678
+    - **Rocket.Chat**: http://localhost:3000
+    - **MinIO Console**: http://localhost:9001
 
 ---
 
-## Run in production (VPS)
+## 🌍 Production Deployment (VPS)
 
-Production mode exposes **only ports 80/443** via Caddy.
+Deploy to a fresh Ubuntu/Debian VPS.
 
-### VPS initial setup (one-time)
+### 1. Prerequisites
+- A domain name (e.g., `example.com`) pointed to your VPS IP.
+- Recommended DNS records:
+  - `hs.example.com` (Headscale)
+  - `plane.example.com`
+  - `n8n.example.com`
+  - `chat.example.com`
 
-Before starting the stack on a fresh VPS, run the bootstrap script once.
-It installs Docker, Docker Compose v2, sets permissions, and prepares `/data` for persistence.
+### 3. Provision & Boot
+Run the setup script which installs Docker, generates your configuration, and prepares directories.
 
 ```bash
-chmod +x scripts/setup-vps.sh
-./scripts/setup-vps.sh
-```
+# 1. Run Setup (Generates env/.env.prod)
+./scripts/setup prod
 
-If the script adds your user to the docker group, log out and back in before continuing.
+# 2. Review the generated config
+nano env/.env.prod
+# Verify DOMAIN, EMAIL and other settings
 
-### Run in production (VPS)
-
-Start:
-```bash
+# 3. Start the stack
 ./scripts/up prod
 ```
 
-Services:
-- Plane: `https://plane.<domain>`
-- n8n: `https://n8n.<domain>`
-- Rocket.Chat: `https://chat.<domain>`
+### 4. Configure VPN
+Now that the stack is running, initialize the VPN control plane.
 
-Stop:
 ```bash
-./scripts/down prod
+# 1. Initialize Headscale user & Namespace
+./scripts/bootstrap
+
+# 2. Connect the VPS itself to the Tailnet
+./scripts/join-tailnet
 ```
 
----
+### 5. Client Access
+To access your apps, your laptop must join the Tailnet.
 
-## Reverse proxy notes (Caddy)
-
-### Plane frontend port
-
-The Plane frontend container listens on **port 3000** internally (not 80).  
-So your Caddyfile should route to `plane-web:3000`:
-
-```caddy
-plane.<domain> {
-  reverse_proxy plane-web:3000
-}
+```bash
+# Generate a pre-auth key for your device (e.g., 'my-macbook')
+./scripts/vpn-keygen my-macbook
 ```
+1.  Install [Tailscale](https://tailscale.com/download) on your device.
+2.  Login to your **custom control server** (Headscale):
+    - **MacOS/Windows**: Shift-Click the Tailscale icon -> Debug -> "Add Account..." -> Use your `https://hs.example.com` URL.
+    - **Linux**: `tailscale up --login-server https://hs.example.com --authkey <YOUR_KEY>`
 
-### Plane worker command
-
-The backend image includes the worker entrypoint at:
-
-- `/code/bin/docker-entrypoint-worker.sh`
-
-So the worker service should use:
-
-```yaml
-command: ["/code/bin/docker-entrypoint-worker.sh"]
-```
+Once connected, you can access your apps at `https://plane.example.com`, etc.
 
 ---
 
-## Persistence
+## 🛠 Management & Troubleshooting
 
-Persistent data is stored in Docker volumes (base compose):
+- **Stop Services**:
+  ```bash
+  docker compose -f compose/compose.yml -f compose/compose.prod.yml down
+  # OR use the helper
+  ./scripts/down
+  ```
+- **Logs**:
+  ```bash
+  docker compose -f compose/compose.yml logs -f plane-api
+  ```
+- **Filesystem**: Data is persisted in `/data` on the host machine.
 
-- PostgreSQL (Plane)
-- MinIO (uploads)
-- n8n state
-- MongoDB (Rocket.Chat)
-- Caddy certificates
 
-On a VPS, volumes are bound to a persistent disk (e.g. `/data`) via `compose.prod.yml`.
+## 🗺️ Roadmap
 
-> Note: n8n runs as a non‑root user. On a VPS, ensure `/data/n8n` is writable by UID/GID `1000:1000` (handled by `setup-vps.sh`).
+- [ ] **CRM Integration**: Evaluate and integrate an open-source CRM (e.g., [Twenty](https://twenty.com)) to complete the business stack.
+- [ ] **ClickHouse**: Enable analytics stack (currently optional/commented out).
+- [ ] **Monitoring**: Add Prometheus/Grafana for stack observability.
 
----
-
-## Automation & webhooks (Plane → n8n)
-
-Local:
-```
-http://host.docker.internal:5678/webhook/<workflow-id>
-```
-
-Production:
-```
-https://n8n.<domain>/webhook/<workflow-id>
-```
-
-Same workflow, same logic — only the base URL changes.
-
----
-
-## Rocket.Chat integrations
-
-Rocket.Chat is intended to be used with:
-- Bots
-- Webhooks
-- n8n workflows
-
-Typical flows:
-- Plane issue created → notify channel
-- Status change → DM assignees
-- Project created → auto‑create channel
-
----
-
-## Backup strategy (recommended)
-
-- **PostgreSQL**: nightly `pg_dump` → off‑site storage
-- **MongoDB**: periodic dump → off‑site storage
-- **MinIO**: bucket sync / replication
-- **Config**: Git
-
-VM snapshots alone are **not** sufficient.
-
----
-
-## Future extensions
-
-- Enable ClickHouse for analytics
-- Add VPN (WireGuard / Tailscale)
-- Add SSO (OIDC) at the Caddy or app level
-- Externalize databases if scale requires it
-
----
-
-## Contributing
-
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** (includes roadmap + how to propose changes).
-
-Contact: **contact@celerinc.com**
-
----
-
-## Golden rule
-
-> If it runs locally, it must run in production  
-> without rewriting anything.
-
-Only environment files and compose overrides may differ.
-
----
-
-## License
-
-MIT — see `LICENSE`
+## 📄 License
+Released under the [MIT License](./LICENCE).

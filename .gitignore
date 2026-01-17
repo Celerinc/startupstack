@@ -47,3 +47,6 @@ known_hosts.old
 # Future updates
 tf/
 ./tf/
+
+# Headscale config
+compose/headscale/config.yaml

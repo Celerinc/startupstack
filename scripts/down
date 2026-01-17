@@ -24,6 +24,7 @@ elif [ "$MODE" = "prod" ]; then
 else
   echo "❌ Invalid mode: $MODE"
   echo "Usage: ./scripts/down [local|prod] [analytics]"
+  echo "  (analytics: tears down future monitoring stack)"
   exit 1
 fi
 

@@ -7,9 +7,20 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - /data/caddy/data:/data
       - /data/caddy/config:/config
+
+  # -----------------
+  # HEADSCALE
+  # -----------------
+  headscale:
+    expose:
+      - "8080"
+
+  headplane:
+    expose:
+      - "3000"
 
   # -----------------
   # PLANE

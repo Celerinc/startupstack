@@ -43,7 +43,7 @@ We keep it lightweight:
 
 ### Commit messages
 
-Use conventional-ish prefixes (no ceremony, just clarity):
+Use conventional-ish prefixes (no ceremony, just clarity). Scopes are optional but encouraged for context:
 
 - `feat:` new capability
 - `fix:` bug fix
@@ -52,10 +52,10 @@ Use conventional-ish prefixes (no ceremony, just clarity):
 - `chore:` tooling, maintenance, deps, formatting
 
 Examples:
-- `fix: run Plane web on port 3000 behind Caddy`
-- `fix: n8n volume permissions on VPS`
-- `docs: clarify Caddy basic_auth + password hashing`
-- `refactor: simplify compose overrides (local vs prod)`
+- `feat(infra): dynamic environment configuration`
+- `fix(plane): run Plane web on port 3000 behind Caddy`
+- `docs(vpn): clarify Headscale setup steps`
+- `refactor: simplify compose overrides`
 
 ---
 
@@ -84,28 +84,21 @@ Examples:
 
 ## Roadmap
 
-### Short term
-- Plane worker hardening
+See [README.md](./README.md#%EF%B8%8F-roadmap) for the high-level roadmap.
+
+### Next up
 - Backup scripts
 - IP allow‑listing at Caddy level
+- Observability stack (Prometheus/Grafana)
 
-### Mid term
-- Optional ClickHouse profile
-- Observability stack
-- SSO / OIDC examples
-
-### Long term
-- Multi‑node patterns
-- External DB patterns
-- Opinionated presets
 
 ---
 
 ## Principles
 
-- Local == Production
-- Explicit over clever
-- Reproducible over convenient
+- **Architecture Parity**: Run the same containers locally and in prod. Only the access layer differs (VPN vs localhost).
+- **Explicit over clever**: Clear configuration is better than "magic".
+- **Reproducible over convenient**: Setup scripts ensure consistency across environments.
 
 ---
 

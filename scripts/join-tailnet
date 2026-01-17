@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+
+# Source env vars to get DOMAIN
+if [ -f env/.env.prod ]; then
+  export $(grep -v '^#' env/.env.prod | xargs)
+else
+  echo "⚠️ env/.env.prod not found. Cannot determine DOMAIN."
+  exit 1
+fi
+
+echo "▶️ Joining VPS to Headscale tailnet (auto)"
+
+# 1) Ensure tailscale is installed on the VPS host
+if ! command -v tailscale >/dev/null 2>&1; then
+  echo "Installing Tailscale on host..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+# 2) Resolve Headscale user ID for 'ssuser' (inside Docker)
+echo "Resolving Headscale user ID for 'ssuser'..."
+USER_ID=$(docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec -T headscale \
+  headscale users list --output json \
+  | jq -r '.[] | select(.name=="ssuser") | .id')
+
+if [ -z "${USER_ID}" ] || [ "${USER_ID}" = "null" ]; then
+  echo "❌ Could not find Headscale user 'ssuser'. Run bootstrap first to create it."
+  exit 1
+fi
+
+echo "User 'ssuser' has ID=${USER_ID}"
+
+# 3) Create a reusable preauth key for this VPS
+echo "Creating preauth key for VPS..."
+AUTH_KEY=$(docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec -T headscale \
+  headscale preauthkeys create \
+    --user "${USER_ID}" \
+    --reusable \
+    --expiration 8760h \
+    --output json \
+  | jq -r '.key')
+
+if [ -z "${AUTH_KEY}" ] || [ "${AUTH_KEY}" = "null" ]; then
+  echo "❌ Failed to generate preauth key"
+  exit 1
+fi
+
+echo "Preauth key generated."
+
+# 4) Connect VPS host to Headscale using this key
+echo "Connecting VPS host to Headscale (hs.${DOMAIN})..."
+sudo tailscale up \
+  --login-server="https://hs.${DOMAIN}" \
+  --auth-key="${AUTH_KEY}" \
+  --accept-dns \
+  --accept-routes
+
+# 5) Show tailnet IP of this VPS
+IP4=$(sudo tailscale ip -4 || true)
+IP6=$(sudo tailscale ip -6 || true)
+
+echo "✅ VPS joined tailnet."
+echo "   Tailnet IPv4: ${IP4}"
+echo "   Tailnet IPv6: ${IP6}"

@@ -1,0 +1,56 @@
+server_url: https://hs.example.com
+listen_addr: 0.0.0.0:8080
+
+grpc_listen_addr: 0.0.0.0:50443
+
+metrics_listen_addr: 0.0.0.0:9090
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+
+dns:
+  magic_dns: true
+  base_domain: example.internal
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 8.8.8.8
+  extra_records:
+    - name: "plane.example.com"
+      type: "A"
+      value: "100.64.0.1"
+    - name: "n8n.example.com"
+      type: "A"
+      value: "100.64.0.1"
+    - name: "chat.example.com"
+      type: "A"
+      value: "100.64.0.1"
+    - name: "s3.example.com"
+      type: "A"
+      value: "100.64.0.1"
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+
+derp:
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  auto_update_enabled: true
+  update_frequency: 24h
+  server:
+    enabled: false
+
+log:
+  level: info
+  format: text
+
+policy:
+  path: ""
+
+unix_socket: /var/run/headscale/headscale.sock

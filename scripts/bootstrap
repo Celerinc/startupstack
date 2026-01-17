@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+USER="${1:-ssuser}"
+
+echo "▶️ Headscale bootstrap (user=$USER)"
+
+# Check if user exists
+if docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale headscale users list | grep -qE "\\s$USER\\s"; then
+  echo "ℹ️ User '$USER' already exists"
+else
+  echo "➕ Creating user '$USER'"
+  docker compose \
+    -f compose/compose.yml \
+    -f compose/compose.prod.yml \
+    --env-file env/.env.prod \
+    exec headscale headscale users create "$USER"
+fi
+
+echo "✅ Headscale bootstrap done"

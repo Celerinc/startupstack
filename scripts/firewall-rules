@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "▶️ Configuring UFW (host firewall)"
+
+sudo ufw --force reset
+
+# Default policy
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# SSH from anywhere (keep box manageable)
+sudo ufw allow OpenSSH
+
+# Public HTTPS entrypoint for Caddy/Headscale (hs.${DOMAIN})
+sudo ufw allow 443/tcp
+
+# Allow all traffic coming in via Tailscale (tailnet)
+sudo ufw allow in on tailscale0
+
+# Optionally be explicit (not strictly needed once interface is allowed)
+sudo ufw allow in on tailscale0 to any port 443 proto tcp
+sudo ufw allow in on tailscale0 to any port 80 proto tcp
+
+sudo ufw --force enable
+
+echo
+sudo ufw status numbered

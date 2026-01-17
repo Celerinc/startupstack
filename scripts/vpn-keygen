@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+USERNAME="${1:-ssuser}"
+EXPIRATION="${2:-8760h}"
+OUTFILE="${3:-headscale.key}"
+
+echo "🔑 Generating Headscale preauth key (username=$USERNAME, exp=$EXPIRATION)"
+
+docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale \
+  headscale users list | grep -qw "$USERNAME" \
+  || {
+    echo "➕ User '$USERNAME' not found — creating"
+    docker compose \
+      -f compose/compose.yml \
+      -f compose/compose.prod.yml \
+      --env-file env/.env.prod \
+      exec headscale headscale users create "$USERNAME"
+  }
+
+USER_ID=$(docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale \
+  headscale users list --output json \
+  | jq -r ".[] | select(.name==\"$USERNAME\") | .id")
+
+docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale \
+  headscale preauthkeys create \
+    --user "$USER_ID" \
+    --reusable \
+    --expiration "$EXPIRATION" \
+    --output json \
+  | jq -r '.key' > "$OUTFILE"
+
+echo "✅ Key saved: $OUTFILE (user_id=$USER_ID)"
