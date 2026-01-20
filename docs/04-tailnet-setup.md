@@ -51,3 +51,21 @@ And check from the Headscale container:
 ```bash
 docker compose -f compose/compose.yml -f compose/compose.prod.yml --env-file env/.env.prod exec headscale headscale nodes list
 ```
+
+## 3. Manual Node Registration
+
+Sometimes a device (like a router or server) provides a "node key" (e.g., from the logs) and asks you to register it manually in the CLI.
+
+We provide helper scripts for this:
+
+1.  **Ensure User Exists**:
+    ```bash
+    ./scripts/create-user myuser
+    ```
+
+2.  **Register the Key**:
+    ```bash
+    ./scripts/register-node myuser mkey:12345...
+    ```
+
+This is easier than running the full `docker compose exec` command manually.

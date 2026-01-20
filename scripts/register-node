@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check arguments
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <username> <node_key>"
+  echo "Example: $0 ssuser a1b2c3d4..."
+  exit 1
+fi
+
+USERNAME="$1"
+NODE_KEY="$2"
+
+echo "▶️ Registering node for user: $USERNAME"
+
+# 1. Verify user exists first
+if ! docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale headscale users list | grep -qE "\\s$USERNAME\\s"; then
+  echo "❌ Error: User '$USERNAME' does not exist."
+  echo "   Run './scripts/create-user $USERNAME' first."
+  exit 1
+fi
+
+# 2. Register the key
+docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale headscale nodes register --user "$USERNAME" --key "$NODE_KEY"
+
+echo "✅ Node registered successfully to user '$USERNAME'."

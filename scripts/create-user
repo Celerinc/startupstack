@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check arguments
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <username>"
+  exit 1
+fi
+
+USERNAME="$1"
+
+echo "▶️ Creating Headscale user: $USERNAME"
+
+# Check if user exists
+if docker compose \
+  -f compose/compose.yml \
+  -f compose/compose.prod.yml \
+  --env-file env/.env.prod \
+  exec headscale headscale users list | grep -qE "\\s$USERNAME\\s"; then
+  echo "ℹ️ User '$USERNAME' already exists."
+else
+  echo "➕ Creating user '$USERNAME'..."
+  docker compose \
+    -f compose/compose.yml \
+    -f compose/compose.prod.yml \
+    --env-file env/.env.prod \
+    exec headscale headscale users create "$USERNAME"
+  echo "✅ User '$USERNAME' created."
+fi
