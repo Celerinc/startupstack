@@ -50,3 +50,9 @@ tf/
 
 # Headscale config
 compose/headscale/config.yaml
+
+# Local agent policy overrides
+AGENTS.override.md
+
+# Local/private agent memory
+docs/agentic/private-memory.md
