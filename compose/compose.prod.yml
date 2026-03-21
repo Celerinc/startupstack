@@ -66,19 +66,6 @@ services:
       - /data/n8n:/home/node/.n8n
 
   # -----------------
-  # ROCKET.CHAT
-  # -----------------
-  rocketchat:
-    expose:
-      - "3000"
-    volumes:
-      - /data/rocketchat/uploads:/app/uploads
-
-  rocketchat-mongo:
-    volumes:
-      - /data/rocketchat/mongo:/data/db
-
-  # -----------------
   # CLICKHOUSE (later)
   # -----------------
   # clickhouse:

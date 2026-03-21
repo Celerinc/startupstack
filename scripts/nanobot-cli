@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-prod}" # local | prod
+shift || true
+
+if [ "$MODE" != "local" ] && [ "$MODE" != "prod" ]; then
+  echo "❌ Invalid mode: $MODE"
+  echo "Usage: ./scripts/nanobot-cli [local|prod] <nanobot-command...>"
+  echo "Example: ./scripts/nanobot-cli prod onboard"
+  exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+  set -- status
+fi
+
+BASE_ARGS=(-f compose/compose.yml)
+if [ "$MODE" = "local" ]; then
+  MODE_ARGS=(-f compose/compose.local.yml --env-file env/.env.local)
+else
+  MODE_ARGS=(-f compose/compose.prod.yml --env-file env/.env.prod)
+fi
+
+docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli run --rm nanobot-cli "$@"

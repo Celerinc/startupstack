@@ -1,5 +1,5 @@
 {
-  email {$EMAIL}
+  email {$EMAIL:admin@example.com}
 }
 
 # Client (100.64.0.4)
@@ -12,10 +12,10 @@
 #  ↓
 # Caddy sees remote_ip=172.18.0.5
 #  ↓
-# plane, n8n, chat
+# plane, n8n
 
-# When Docker creates a default bridge network, 
-# it allocates a private container subnet 
+# When Docker creates a default bridge network,
+# it allocates a private container subnet
 (vpn_only) {
   @notvpn not remote_ip 172.16.0.0/12
   respond @notvpn 403
@@ -64,7 +64,6 @@ plane.{$DOMAIN} {
 # -------------------------
 # MinIO
 # -------------------------
-
 s3.{$DOMAIN} {
   import vpn_only
   reverse_proxy plane-minio:9000
@@ -76,14 +75,6 @@ s3.{$DOMAIN} {
 n8n.{$DOMAIN} {
   import vpn_only
   reverse_proxy n8n:5678
-}
-
-# -------------------------
-# Rocket.Chat
-# -------------------------
-chat.{$DOMAIN} {
-  import vpn_only
-  reverse_proxy rocketchat:3000
 }
 
 # -------------------------

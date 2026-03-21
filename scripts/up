@@ -2,28 +2,48 @@
 set -euo pipefail
 
 MODE="${1:-local}"          # local | prod
-PROFILE="${2:-}"            # optional: analytics
+shift || true
+PROFILES=("$@")             # optional: ai analytics ai-cli
 
-BASE="-f compose/compose.yml"
-LOCAL="-f compose/compose.local.yml --env-file env/.env.local"
-PROD="-f compose/compose.prod.yml --env-file env/.env.prod"
+BASE_ARGS=(-f compose/compose.yml)
+LOCAL_ARGS=(-f compose/compose.local.yml --env-file env/.env.local)
+PROD_ARGS=(-f compose/compose.prod.yml --env-file env/.env.prod)
 
-PROFILE_FLAG=""
-if [ "$PROFILE" = "analytics" ]; then
-  PROFILE_FLAG="--profile analytics"
-fi
+PROFILE_ARGS=()
+for profile in "${PROFILES[@]}"; do
+  case "$profile" in
+    "" )
+      ;;
+    ai|ai-cli|analytics)
+      PROFILE_ARGS+=(--profile "$profile")
+      ;;
+    *)
+      echo "❌ Invalid profile: $profile"
+      echo "Usage: ./scripts/up [local|prod] [ai] [ai-cli] [analytics]"
+      exit 1
+      ;;
+  esac
+done
 
 echo "▶️  Starting StartupStack"
-echo "   Mode: $MODE ${PROFILE:+(profile: $PROFILE)}"
+if [ "${#PROFILES[@]}" -gt 0 ]; then
+  echo "   Mode: $MODE (profiles: ${PROFILES[*]})"
+else
+  echo "   Mode: $MODE"
+fi
+
+# Auto-bootstrap NanoBot config when AI profile is requested.
+if printf '%s\n' "${PROFILES[@]}" | grep -qx "ai"; then
+  ./scripts/nanobot-init "$MODE"
+fi
 
 if [ "$MODE" = "local" ]; then
-  docker compose $BASE $LOCAL $PROFILE_FLAG up -d
+  docker compose "${BASE_ARGS[@]}" "${LOCAL_ARGS[@]}" "${PROFILE_ARGS[@]}" up -d
 elif [ "$MODE" = "prod" ]; then
-  docker compose $BASE $PROD $PROFILE_FLAG up -d
+  docker compose "${BASE_ARGS[@]}" "${PROD_ARGS[@]}" "${PROFILE_ARGS[@]}" up -d
 else
   echo "❌ Invalid mode: $MODE"
-  echo "Usage: ./scripts/up [local|prod] [analytics]"
-  echo "  (analytics: enables future monitoring stack, widely commented out currently)"
+  echo "Usage: ./scripts/up [local|prod] [ai] [ai-cli] [analytics]"
   exit 1
 fi
 

@@ -14,10 +14,6 @@ services:
     ports:
       - "5678:5678"
 
-  rocketchat:
-    ports:
-      - "3000:3000"
-
   # Optional: Expose Headplane UI locally for inspection
   # headplane:
   #   ports:

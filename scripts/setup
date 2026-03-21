@@ -2,6 +2,7 @@
 set -euo pipefail
 
 echo "== StartupStack VPS setup =="
+HOME_DIR="$(eval echo "~$USER")"
 
 # 1. Ensure Docker is available
 if ! command -v docker >/dev/null 2>&1; then
@@ -30,8 +31,8 @@ sudo mkdir -p \
   /data/plane/postgres \
   /data/plane/minio \
   /data/n8n \
-  /data/rocketchat/mongo \
-  /data/rocketchat/uploads \
+  "${HOME_DIR}/agents/.alex" \
+  "${HOME_DIR}/agents/.oauth" \
   /data/caddy/data \
   /data/caddy/config
 
@@ -54,13 +55,9 @@ sudo chmod -R 775 /data/plane/minio
 sudo chown -R 1000:1000 /data/n8n
 sudo chmod -R 775 /data/n8n
 
-# Rocket.Chat Mongo
-sudo chown -R 999:999 /data/rocketchat/mongo
-sudo chmod -R 700 /data/rocketchat/mongo
-
-# Rocket.Chat uploads
-sudo chown -R root:root /data/rocketchat/uploads
-sudo chmod -R 775 /data/rocketchat/uploads
+# NanoBot state + shared oauth dir
+sudo chown -R "$USER:$USER" "${HOME_DIR}/agents"
+sudo chmod -R 700 "${HOME_DIR}/agents/.alex" "${HOME_DIR}/agents/.oauth"
 
 # Caddy
 sudo chown -R 1000:1000 /data/caddy
@@ -75,7 +72,9 @@ chmod +x \
   scripts/vpn-keygen \
   scripts/firewall-lockdown \
   scripts/firewall-rules \
-  scripts/join-tailnet
+  scripts/join-tailnet \
+  scripts/nanobot-cli \
+  scripts/nanobot-init
 
 # 7. Basic firewall bootstrap: delegate to firewall-rules
 echo "Configuring firewall via scripts/firewall-rules..."
@@ -109,11 +108,11 @@ if [ -n "$DOMAIN" ]; then
   if [ ! -f "$TARGET_ENV" ]; then
     echo "Generating $TARGET_ENV for $DOMAIN..."
     cp env/.env.example "$TARGET_ENV"
-    
+
     # Update DOMAIN and EMAIL
     sedi "s/DOMAIN=example.com/DOMAIN=$DOMAIN/g" "$TARGET_ENV"
     if [ -n "$EMAIL" ]; then
-      sedi "s/EMAIL=admin@example.com/EMAIL=$EMAIL/g" "$TARGET_ENV"
+      sedi "s#EMAIL=admin@\\${DOMAIN}#EMAIL=$EMAIL#g" "$TARGET_ENV"
     fi
 
     # Randomize secrets
@@ -127,11 +126,11 @@ if [ -n "$DOMAIN" ]; then
   if [ ! -f compose/headscale/config.yaml ]; then
     echo "Generating compose/headscale/config.yaml for $DOMAIN..."
     cp compose/headscale/config.example.yaml compose/headscale/config.yaml
-    
+
     # Extract "example" from "example.com" or "sub.example.com" -> "example"
     # Simple extraction of the first part before the first dot
     BASE_NAME=$(echo "$DOMAIN" | cut -d. -f1)
-    
+
     sedi "s/example.com/$DOMAIN/g" compose/headscale/config.yaml
     sedi "s/example.internal/${BASE_NAME}.internal/g" compose/headscale/config.yaml
   else
@@ -144,7 +143,8 @@ echo "Next steps:"
 echo "1) Review $TARGET_ENV"
 echo "2) Review compose/compose.${ENV}.yml"
 echo "3) Run: ./scripts/up $ENV"
-echo "4) Run: ./scripts/bootstrap         # creates Headscale user 'ssuser', DNS extras, etc."
-echo "5) Run: ./scripts/join-tailnet      # join VPS itself to tailnet"
-echo "6) Run: ./scripts/vpn-keygen <name>       # generate key for your Mac"
-echo "7) (Optional) Run: ./scripts/firewall-lockdown  # if you ever changed Docker iptables"
+echo "4) Run: ./scripts/bootstrap                # creates Headscale user 'ssuser', DNS extras, etc."
+echo "5) Run: ./scripts/join-tailnet             # join VPS itself to tailnet"
+echo "6) Run: ./scripts/vpn-keygen <name>        # generate key for your Mac"
+echo "7) Run: ./scripts/up $ENV ai                # auto-configure and start NanoBot from env"
+echo "8) (Optional) Run: ./scripts/firewall-lockdown  # if you ever changed Docker iptables"

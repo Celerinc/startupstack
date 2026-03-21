@@ -10,9 +10,6 @@ volumes:
   plane_minio_data:
   # n8n
   n8n_data:
-  # Rocket.Chat
-  rocketchat_mongo_data:
-  rocketchat_uploads:
   # Caddy
   caddy_data:
   caddy_config:
@@ -20,6 +17,15 @@ volumes:
   headscale_data:
   # ClickHouse (optional)
   # clickhouse_data:
+
+x-nanobot-common: &nanobot-common
+  build:
+    context: ../external/nanobot
+    dockerfile: Dockerfile
+  volumes:
+    - ${NANOBOT_STATE_DIR:-../agents/.alex}:/root/.nanobot
+    - ${NANOBOT_OAUTH_DIR:-../agents/.oauth}:/root/.local/share/oauth-cli-kit
+  networks: [internal]
 
 services:
   # -----------------
@@ -29,8 +35,8 @@ services:
     image: caddy:2.8.4
     networks: [edge, internal]
     environment:
-      - DOMAIN
-      - EMAIL
+      DOMAIN: ${DOMAIN}
+      EMAIL: ${EMAIL}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -229,39 +235,21 @@ services:
     restart: unless-stopped
 
   # -----------------
-  # ROCKET.CHAT + MONGODB (single-node replica set)
+  # NANOBOT (optional AI assistant)
   # -----------------
-  rocketchat-mongo:
-    image: mongo:7
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    volumes:
-      - rocketchat_mongo_data:/data/db
-    networks: [internal]
+  nanobot-gateway:
+    <<: *nanobot-common
+    profiles: ["ai"]
+    command: ["gateway"]
     restart: unless-stopped
 
-  rocketchat-mongo-init:
-    image: mongo:7
-    depends_on: [rocketchat-mongo]
-    networks: [internal]
+  nanobot-cli:
+    <<: *nanobot-common
+    profiles: ["ai-cli"]
+    command: ["status"]
+    stdin_open: true
+    tty: true
     restart: "no"
-    command: >
-      bash -lc "mongosh --host rocketchat-mongo:27017 --eval '
-      try { rs.status() } catch(e) { rs.initiate({_id:\"rs0\", members:[{_id:0, host:\"rocketchat-mongo:27017\"}]}) }
-      '"
-
-  rocketchat:
-    image: rocketchat/rocket.chat:6.7.0
-    depends_on: [rocketchat-mongo-init]
-    environment:
-      MONGO_URL: mongodb://rocketchat-mongo:27017/rocketchat?replicaSet=rs0
-      MONGO_OPLOG_URL: mongodb://rocketchat-mongo:27017/local?replicaSet=rs0
-      ROOT_URL: ${ROCKETCHAT_ROOT_URL}
-      PORT: 3000
-      OVERWRITE_SETTING_Accounts_RegistrationForm: "Disabled"
-    volumes:
-      - rocketchat_uploads:/app/uploads
-    networks: [internal]
-    restart: unless-stopped
 
   # -----------------
   # CLICKHOUSE (optional)

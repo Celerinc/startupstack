@@ -29,6 +29,7 @@ Instructions for all Codex/OpenAI agents working in this repository.
 - Make minimal, targeted edits. Do not reformat unrelated files.
 - Do not run destructive git commands (`reset --hard`, checkout revert) unless explicitly asked.
 - If unexpected changes appear, pause and ask the user.
+- Do not ask for confirmation when the change only touches Markdown files (`*.md`); apply those documentation edits directly.
 
 ## Directory-Specific Policy
 - If a deeper `AGENTS.md` exists, follow the closest one for that directory in addition to this root policy.

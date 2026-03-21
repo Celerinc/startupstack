@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-prod}" # local | prod
+
+if [ "$MODE" != "local" ] && [ "$MODE" != "prod" ]; then
+  echo "❌ Invalid mode: $MODE"
+  echo "Usage: ./scripts/nanobot-init [local|prod]"
+  exit 1
+fi
+
+if [ "$MODE" = "local" ]; then
+  ENV_FILE="env/.env.local"
+  MODE_ARGS=(-f compose/compose.local.yml --env-file env/.env.local)
+else
+  ENV_FILE="env/.env.prod"
+  MODE_ARGS=(-f compose/compose.prod.yml --env-file env/.env.prod)
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ Missing env file: $ENV_FILE"
+  exit 1
+fi
+
+set -a
+source "$ENV_FILE"
+set +a
+
+if [ -z "${NANOBOT_OPENAI_API_KEY:-}" ] || [ -z "${NANOBOT_SLACK_BOT_TOKEN:-}" ] || [ -z "${NANOBOT_SLACK_APP_TOKEN:-}" ]; then
+  echo "❌ Missing NanoBot variables in $ENV_FILE"
+  echo "Required: NANOBOT_OPENAI_API_KEY, NANOBOT_SLACK_BOT_TOKEN, NANOBOT_SLACK_APP_TOKEN"
+  exit 1
+fi
+
+BASE_ARGS=(-f compose/compose.yml)
+
+# Ensure base config exists.
+docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli run --rm --entrypoint /bin/sh nanobot-cli -lc '
+  set -eu
+  if [ ! -f /root/.nanobot/config.json ]; then
+    nanobot onboard >/dev/null
+  fi
+'
+
+# Patch config with env-driven provider/channel settings.
+docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli run --rm \
+  --entrypoint /bin/sh \
+  -e NB_PROVIDER="${NANOBOT_PROVIDER:-openai}" \
+  -e NB_MODEL="${NANOBOT_MODEL:-openai/gpt-5.3-codex}" \
+  -e NB_REASONING_EFFORT="${NANOBOT_REASONING_EFFORT:-low}" \
+  -e NB_MAX_TOKENS="${NANOBOT_MAX_TOKENS:-16384}" \
+  -e NB_CONTEXT_WINDOW_TOKENS="${NANOBOT_CONTEXT_WINDOW_TOKENS:-128000}" \
+  -e NB_TEMPERATURE="${NANOBOT_TEMPERATURE:-0.1}" \
+  -e NB_OPENAI_KEY="${NANOBOT_OPENAI_API_KEY}" \
+  -e NB_SLACK_BOT="${NANOBOT_SLACK_BOT_TOKEN}" \
+  -e NB_SLACK_APP="${NANOBOT_SLACK_APP_TOKEN}" \
+  -e NB_SLACK_ALLOW="${NANOBOT_SLACK_ALLOW_FROM:-}" \
+  nanobot-cli -lc '
+    set -eu
+    python3 - <<'"'"'PY'"'"'
+import json
+import os
+from pathlib import Path
+
+cfg_path = Path("/root/.nanobot/config.json")
+cfg = json.loads(cfg_path.read_text())
+
+provider = os.environ.get("NB_PROVIDER", "openai")
+# Normalize common aliases to nanobot canonical provider keys.
+provider_aliases = {
+    "openaiCodex": "openai_codex",
+    "openai-codex": "openai_codex",
+}
+provider = provider_aliases.get(provider, provider)
+model = os.environ.get("NB_MODEL", "openai/gpt-5.3-codex")
+reasoning_effort = os.environ.get("NB_REASONING_EFFORT", "low")
+max_tokens = int(os.environ.get("NB_MAX_TOKENS", "16384"))
+context_window_tokens = int(os.environ.get("NB_CONTEXT_WINDOW_TOKENS", "128000"))
+temperature = float(os.environ.get("NB_TEMPERATURE", "0.1"))
+openai_key = os.environ.get("NB_OPENAI_KEY", "")
+slack_bot = os.environ.get("NB_SLACK_BOT", "")
+slack_app = os.environ.get("NB_SLACK_APP", "")
+slack_allow = os.environ.get("NB_SLACK_ALLOW", "")
+allow_list = [x.strip() for x in slack_allow.split(",") if x.strip()]
+
+# LiteLLM may require an explicit provider prefix for newer OpenAI models.
+if provider == "openai" and "/" not in model:
+    model = f"openai/{model}"
+
+cfg.setdefault("agents", {}).setdefault("defaults", {})
+cfg["agents"]["defaults"]["provider"] = provider
+cfg["agents"]["defaults"]["model"] = model
+cfg["agents"]["defaults"]["reasoningEffort"] = reasoning_effort
+cfg["agents"]["defaults"]["maxTokens"] = max_tokens
+cfg["agents"]["defaults"]["contextWindowTokens"] = context_window_tokens
+cfg["agents"]["defaults"]["temperature"] = temperature
+
+cfg.setdefault("providers", {}).setdefault("openai", {})
+cfg["providers"]["openai"]["apiKey"] = openai_key
+cfg.setdefault("providers", {}).setdefault("openaiCodex", {})
+cfg["providers"]["openaiCodex"]["apiKey"] = openai_key
+cfg.setdefault("providers", {}).setdefault("openai_codex", {})
+cfg["providers"]["openai_codex"]["apiKey"] = openai_key
+
+cfg.setdefault("channels", {}).setdefault("slack", {})
+cfg["channels"]["slack"]["enabled"] = True
+cfg["channels"]["slack"]["mode"] = "socket"
+cfg["channels"]["slack"]["botToken"] = slack_bot
+cfg["channels"]["slack"]["appToken"] = slack_app
+cfg["channels"]["slack"]["allowFrom"] = allow_list
+
+cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+PY
+    chmod 600 /root/.nanobot/config.json
+  '
+
+echo "✅ NanoBot initialized from $ENV_FILE"

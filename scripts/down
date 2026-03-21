@@ -2,29 +2,44 @@
 set -euo pipefail
 
 MODE="${1:-local}"          # local | prod
-PROFILE="${2:-}"            # optional: analytics
+shift || true
+PROFILES=("$@")             # optional: ai analytics ai-cli
 
-BASE="-f compose/compose.yml"
-LOCAL="-f compose/compose.local.yml"
-PROD="-f compose/compose.prod.yml"
+BASE_ARGS=(-f compose/compose.yml)
+LOCAL_ARGS=(-f compose/compose.local.yml)
+PROD_ARGS=(-f compose/compose.prod.yml)
 
-PROFILE_FLAG=""
-if [ "$PROFILE" = "analytics" ]; then
-  PROFILE_FLAG="--profile analytics"
-fi
+PROFILE_ARGS=()
+for profile in "${PROFILES[@]}"; do
+  case "$profile" in
+    "" )
+      ;;
+    ai|ai-cli|analytics)
+      PROFILE_ARGS+=(--profile "$profile")
+      ;;
+    *)
+      echo "❌ Invalid profile: $profile"
+      echo "Usage: ./scripts/down [local|prod] [ai] [ai-cli] [analytics]"
+      exit 1
+      ;;
+  esac
+done
 
 echo "⏹️  Stopping StartupStack"
-echo "   Mode: $MODE ${PROFILE:+(profile: $PROFILE)}"
+if [ "${#PROFILES[@]}" -gt 0 ]; then
+  echo "   Mode: $MODE (profiles: ${PROFILES[*]})"
+else
+  echo "   Mode: $MODE"
+fi
 
 if [ "$MODE" = "local" ]; then
-  docker compose $BASE $LOCAL $PROFILE_FLAG down
+  docker compose "${BASE_ARGS[@]}" "${LOCAL_ARGS[@]}" "${PROFILE_ARGS[@]}" down
 elif [ "$MODE" = "prod" ]; then
   echo "⚠️  PROD shutdown"
-  docker compose $BASE $PROD $PROFILE_FLAG down
+  docker compose "${BASE_ARGS[@]}" "${PROD_ARGS[@]}" "${PROFILE_ARGS[@]}" down
 else
   echo "❌ Invalid mode: $MODE"
-  echo "Usage: ./scripts/down [local|prod] [analytics]"
-  echo "  (analytics: tears down future monitoring stack)"
+  echo "Usage: ./scripts/down [local|prod] [ai] [ai-cli] [analytics]"
   exit 1
 fi
 

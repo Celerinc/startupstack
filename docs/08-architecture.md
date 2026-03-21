@@ -1,46 +1,45 @@
 # 08 - Architecture Deep Dive
 
-StartupStack allows you to run a "Zero Trust" internal tool stack on a standard VPS.
+StartupStack runs a zero-trust internal tool stack on a standard VPS.
 
 ## Core Components
 
-1.  **Tailscale / Headscale**:
-    - **Headscale**: A self-hosted implementation of the Tailscale control server.
-    - **Tailscale**: The VPN client.
-    - **Purpose**: Creates a private, encrypted mesh network. No ports need to be opened on the firewall except for the control plane.
+1. Headscale / Tailscale:
+   - Headscale: self-hosted Tailscale control server.
+   - Tailscale: client VPN.
+   - Purpose: private encrypted mesh network.
 
-2.  **Caddy (Reverse Proxy)**:
-    - Sits at the edge of the internal Docker network.
-    - Routes requests based on subdomains (`plane.example.com` -> `plane-web`).
-    - Handles TLS termination (Prod) or self-signed certs (Local).
-    - Can inspect the `Remote-IP` to ensure requests come from the Tailnet (if configured), although the Firewall is the primary defense.
+2. Caddy (Reverse Proxy):
+   - Routes internal app subdomains.
+   - Handles TLS in production.
+   - Can enforce VPN-only access rules.
 
-3.  **Application Containers**:
-    - **Plane**: Three-tier architecture (Web, API, Worker). Uses Redis for queues and Postgres for data.
-    - **n8n**: Node.js based workflow automation.
-    - **Rocket.Chat**: Meteor app backed by MongoDB.
+3. Application Containers:
+   - Plane: web/API/worker architecture with Postgres/Redis/MinIO.
+   - n8n: workflow automation engine.
+   - NanoBot (optional): AI gateway + CLI, Slack-first integration.
 
 ## Data Flow
 
 ```mermaid
 graph TD
     User-->|HTTPS (443)| HeadscaleServer[Headscale (Public)]
-    User-->|VPN Tunnel via UDP| TailscaleInterface[VPS "tailscale0"]
-    
+    User-->|VPN Tunnel| TailscaleInterface[VPS tailscale0]
+
     TailscaleInterface -->|Traffic| Caddy
     Caddy -->|Reverse Proxy| InternalNet[Docker Internal Network]
-    
+
     subgraph "Docker Internal"
         Plane
         n8n
-        RocketChat
+        NanoBot
     end
 ```
 
-## "Local = Prod"
+## Local = Prod
 
-The key to this stack is the shared `compose.yml`.
-- **Local**: We use `compose.local.yml` to map ports (e.g., `8080:80`) so you can access them on `localhost`.
-- **Prod**: We use `compose.prod.yml` to remove port mappings (locking them inside the container network) and define heavy storage paths (`/data`).
+The key is shared `compose.yml`.
+- Local: `compose.local.yml` exposes selected ports.
+- Prod: `compose.prod.yml` keeps apps internal and binds persistent `/data` paths.
 
-This ensures that the *software* running is identical, only the *network exposure* changes.
+The software remains consistent; only exposure/storage strategy changes.

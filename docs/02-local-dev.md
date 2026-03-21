@@ -1,60 +1,43 @@
 # 02 - Local Development
 
-StartupStack is designed to run locally with minimal friction. This is perfect for testing configuration changes or evaluating the included software.
-
-> **Note**: Unlike Production (which requires a VPN), Local Development **does not** need a VPN. We simply expose the services on your local ports (e.g., `localhost:8080`).
-
+StartupStack runs locally with minimal friction for fast iteration.
 
 ## Setup
+1. Clone:
+   ```bash
+   git clone https://github.com/Celerinc/startupstack.git
+   cd startupstack
+   ```
+2. Configure env:
+   ```bash
+   cp env/.env.example env/.env.local
+   ```
 
-1.  **Clone the Repository**:
-    ```bash
-    git clone https://github.com/Celerinc/startupstack.git
-    cd startupstack
-    ```
-
-2.  **Configure Environment**:
-    Create a local environment file. The default example `env/.env.example` is pre-configured with dummy values relevant for local dev.
-    ```bash
-    cp env/.env.example env/.env.local
-    ```
-    > You likely don't need to change anything in `.env.local` for basic testing.
-
-## Starting the Stack
-
-We provide a helper script to launch the stack in "local mode". This mode uses `compose.local.yml` which exposes ports directly to `localhost`.
-
+## Start
 ```bash
 ./scripts/up local
 ```
 
-This command runs:
+Equivalent command:
 ```bash
 docker compose -f compose/compose.yml -f compose/compose.local.yml --env-file env/.env.local up -d
 ```
 
-## Accessing Services
+## Access services
+- Plane: http://localhost:8080
+- n8n: http://localhost:5678
+- MinIO Console: http://localhost:9001
 
-Once all containers are healthy (refer to `docker ps`), you can access them directly:
-
-- **Plane**: [http://localhost:8080](http://localhost:8080)
-- **n8n**: [http://localhost:5678](http://localhost:5678)
-- **Rocket.Chat**: [http://localhost:3000](http://localhost:3000)
-- **MinIO Console**: [http://localhost:9001](http://localhost:9001) (User: `minioadmin`, Pass: `change-me`)
-
-## Stopping
-
-To stop the stack and remove containers:
-
+## Optional: NanoBot locally
 ```bash
-./scripts/down
+./scripts/up local ai
 ```
-Or manually:
+
+## Stop
 ```bash
-docker compose -f compose/compose.yml -f compose/compose.local.yml down
+./scripts/down local
 ```
 
 ## Troubleshooting
-
-- **Port Conflicts**: If port `8080` or `3000` is in use, edit `compose/compose.local.yml` to map to a different host port (e.g., `"8081:8000"`).
-- **Data**: Local data is stored in Docker volumes. To wipe everything, use `./scripts/down -v` (if applicable, or `docker compose down -v`).
+- Port conflicts: update mappings in `compose/compose.local.yml`.
+- Data reset: `docker compose -f compose/compose.yml -f compose/compose.local.yml down -v`.
