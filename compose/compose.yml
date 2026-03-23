@@ -239,12 +239,14 @@ services:
   # -----------------
   nanobot-gateway:
     <<: *nanobot-common
+    container_name: nanobot-alex-gw
     profiles: ["ai"]
     command: ["gateway"]
     restart: unless-stopped
 
   nanobot-cli:
     <<: *nanobot-common
+    container_name: nanobot-alex-cli
     profiles: ["ai-cli"]
     command: ["status"]
     stdin_open: true

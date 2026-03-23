@@ -7,6 +7,7 @@ StartupStack runs locally with minimal friction for fast iteration.
    ```bash
    git clone https://github.com/Celerinc/startupstack.git
    cd startupstack
+   git submodule update --init --recursive
    ```
 2. Configure env:
    ```bash

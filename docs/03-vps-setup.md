@@ -52,11 +52,10 @@ Now that you are logged in as `deploy`:
 # 1. Clone the repo
 git clone https://github.com/Celerinc/startupstack.git
 cd startupstack
+git submodule update --init --recursive
 
-```bash
 # 2. Run the Setup Script
-chmod +x scripts/setup
-./scripts/setup
+./scripts/setup prod
 # Follow the interactive prompts to configure your domain and email.
 ```
 

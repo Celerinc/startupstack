@@ -20,7 +20,7 @@ This repository provides infrastructure-only (Docker Compose + Config). It orche
 | :--- | :--- | :--- |
 | **Plane** | Project & Issue Management | PostgreSQL, Redis, MinIO |
 | **n8n** | Automations & Workflow Automation | SQLite (default) or Postgres |
-| **NanoBot (optional)** | AI company assistant (Slack-first) | Local config in `/data/nanobot` |
+| **NanoBot (optional)** | AI company assistant (Slack-first) | `NANOBOT_STATE_DIR` + `NANOBOT_OAUTH_DIR` |
 | **Headscale** | Private Mesh VPN Controller | SQLite / Embedded |
 | **Headplane** | Web UI for Headscale | - |
 | **MinIO** | S3-compatible Object Storage | Filesystem |
@@ -95,16 +95,22 @@ startupstack/
 
 ## Quick Start: Local Development
 
-1. Prerequisites: install Docker + Docker Compose.
-2. Configure environment:
+1. Clone repository:
+   ```bash
+   git clone https://github.com/Celerinc/startupstack.git
+   cd startupstack
+   git submodule update --init --recursive
+   ```
+2. Prerequisites: install Docker + Docker Compose.
+3. Configure environment:
    ```bash
    cp env/.env.example env/.env.local
    ```
-3. Start core services:
+4. Start core services:
    ```bash
    ./scripts/up local
    ```
-4. Access services:
+5. Access services:
    - Plane: http://localhost:8080
    - n8n: http://localhost:5678
    - MinIO Console: http://localhost:9001
@@ -132,6 +138,7 @@ NanoBot state and OAuth paths are configurable via:
 
 ### 2. Provision + boot
 ```bash
+git submodule update --init --recursive
 ./scripts/setup prod
 nano env/.env.prod
 ./scripts/up prod
@@ -166,6 +173,8 @@ Codex-oriented defaults are supported through env vars:
   docker compose -f compose/compose.yml logs -f plane-api
   ```
 - Data persistence: `/data` on the host.
+- NanoBot persistence: `NANOBOT_STATE_DIR` (state/workspace) and `NANOBOT_OAUTH_DIR` (shared OAuth sessions).
+- If Slack logs show `missing_scope` for reactions, add `reactions:write` in your Slack bot token scopes.
 
 ---
 
