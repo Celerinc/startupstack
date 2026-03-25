@@ -32,6 +32,26 @@ if [ -z "${NANOBOT_OPENAI_API_KEY:-}" ] || [ -z "${NANOBOT_SLACK_BOT_TOKEN:-}" ]
   exit 1
 fi
 
+NANOBOT_STATE_DIR_EFFECTIVE="${NANOBOT_STATE_DIR:-${PWD}/agents/.alex}"
+NANOBOT_OAUTH_DIR_EFFECTIVE="${NANOBOT_OAUTH_DIR:-${PWD}/agents/.oauth}"
+
+# Ensure host-mounted NanoBot directories exist and are writable.
+for d in "$NANOBOT_STATE_DIR_EFFECTIVE" "$NANOBOT_OAUTH_DIR_EFFECTIVE"; do
+  if ! mkdir -p "$d" 2>/dev/null; then
+    echo "❌ Cannot create directory: $d"
+    echo "Run:"
+    echo "  sudo mkdir -p \"$NANOBOT_STATE_DIR_EFFECTIVE\" \"$NANOBOT_OAUTH_DIR_EFFECTIVE\""
+    echo "  sudo chown -R \"$USER:$USER\" \"$(dirname "$NANOBOT_STATE_DIR_EFFECTIVE")\""
+    exit 1
+  fi
+  if [ ! -w "$d" ]; then
+    echo "❌ Directory is not writable: $d"
+    echo "Run:"
+    echo "  sudo chown -R \"$USER:$USER\" \"$(dirname "$NANOBOT_STATE_DIR_EFFECTIVE")\""
+    exit 1
+  fi
+done
+
 BASE_ARGS=(-f compose/compose.yml)
 
 # Ensure base config exists.
@@ -55,6 +75,8 @@ docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli
   -e NB_SLACK_BOT="${NANOBOT_SLACK_BOT_TOKEN}" \
   -e NB_SLACK_APP="${NANOBOT_SLACK_APP_TOKEN}" \
   -e NB_SLACK_ALLOW="${NANOBOT_SLACK_ALLOW_FROM:-}" \
+  -e NB_SEND_PROGRESS="${NANOBOT_SEND_PROGRESS:-false}" \
+  -e NB_SEND_TOOL_HINTS="${NANOBOT_SEND_TOOL_HINTS:-false}" \
   nanobot-cli -lc '
     set -eu
     python3 - <<'"'"'PY'"'"'
@@ -81,6 +103,8 @@ openai_key = os.environ.get("NB_OPENAI_KEY", "")
 slack_bot = os.environ.get("NB_SLACK_BOT", "")
 slack_app = os.environ.get("NB_SLACK_APP", "")
 slack_allow = os.environ.get("NB_SLACK_ALLOW", "")
+send_progress = os.environ.get("NB_SEND_PROGRESS", "false").lower() in ("1", "true", "yes", "on")
+send_tool_hints = os.environ.get("NB_SEND_TOOL_HINTS", "false").lower() in ("1", "true", "yes", "on")
 allow_list = [x.strip() for x in slack_allow.split(",") if x.strip()]
 
 # LiteLLM may require an explicit provider prefix for newer OpenAI models.
@@ -103,6 +127,8 @@ cfg.setdefault("providers", {}).setdefault("openai_codex", {})
 cfg["providers"]["openai_codex"]["apiKey"] = openai_key
 
 cfg.setdefault("channels", {}).setdefault("slack", {})
+cfg["channels"]["sendProgress"] = send_progress
+cfg["channels"]["sendToolHints"] = send_tool_hints
 cfg["channels"]["slack"]["enabled"] = True
 cfg["channels"]["slack"]["mode"] = "socket"
 cfg["channels"]["slack"]["botToken"] = slack_bot
@@ -113,5 +139,17 @@ cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
     chmod 600 /root/.nanobot/config.json
   '
+
+# Sync Alex workspace markdown templates from repo into live NanoBot workspace.
+# This intentionally overwrites managed files for deterministic behavior.
+AGENT_WORKSPACE_SRC="agents/alex/workspace"
+AGENT_WORKSPACE_DST="${NANOBOT_STATE_DIR_EFFECTIVE}/workspace"
+if [ -d "$AGENT_WORKSPACE_SRC" ]; then
+  mkdir -p "$AGENT_WORKSPACE_DST"
+  while IFS= read -r -d '' src; do
+    cp -f "$src" "${AGENT_WORKSPACE_DST}/$(basename "$src")"
+  done < <(find "$AGENT_WORKSPACE_SRC" -maxdepth 1 -type f -name '*.md' -print0)
+  echo "✅ Synced Alex workspace files from ${AGENT_WORKSPACE_SRC}"
+fi
 
 echo "✅ NanoBot initialized from $ENV_FILE"

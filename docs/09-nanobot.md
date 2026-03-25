@@ -20,8 +20,16 @@ Populate these keys in your env file (`env/.env.local` or `env/.env.prod`):
 - `NANOBOT_SLACK_BOT_TOKEN`
 - `NANOBOT_SLACK_APP_TOKEN`
 - `NANOBOT_SLACK_ALLOW_FROM`
+- `NANOBOT_SEND_PROGRESS` (set `false` to suppress interim "working" messages)
+- `NANOBOT_SEND_TOOL_HINTS` (set `false` to suppress tool-hint chatter)
 - `NANOBOT_STATE_DIR`
 - `NANOBOT_OAUTH_DIR`
+
+Directory ownership note:
+- The user running `./scripts/up` must be able to write both `NANOBOT_STATE_DIR` and `NANOBOT_OAUTH_DIR`.
+- On a fresh VPS, run `./scripts/setup prod` first, or fix ownership manually with:
+  - `sudo mkdir -p /home/deploy/agents/.alex /home/deploy/agents/.oauth`
+  - `sudo chown -R deploy:deploy /home/deploy/agents`
 
 Recommended coding defaults:
 - `NANOBOT_PROVIDER=openai`
