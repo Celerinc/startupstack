@@ -32,6 +32,27 @@ if [ -z "${NANOBOT_OPENAI_API_KEY:-}" ] || [ -z "${NANOBOT_SLACK_BOT_TOKEN:-}" ]
   exit 1
 fi
 
+NANOBOT_GITHUB_OWNER_EFFECTIVE="${NANOBOT_GITHUB_OWNER:-celerinc}"
+NANOBOT_GITHUB_DEFAULT_VISIBILITY_EFFECTIVE="${NANOBOT_GITHUB_DEFAULT_VISIBILITY:-private}"
+NANOBOT_GITHUB_BOOTSTRAP_ENABLED=false
+if [ -n "${NANOBOT_GITHUB_TOKEN:-}" ]; then
+  NANOBOT_GITHUB_BOOTSTRAP_ENABLED=true
+fi
+
+if [ "$NANOBOT_GITHUB_BOOTSTRAP_ENABLED" = true ] && [ -z "$NANOBOT_GITHUB_OWNER_EFFECTIVE" ]; then
+  echo "❌ NANOBOT_GITHUB_OWNER is required when NANOBOT_GITHUB_TOKEN is set."
+  exit 1
+fi
+
+case "$NANOBOT_GITHUB_DEFAULT_VISIBILITY_EFFECTIVE" in
+  private|public) ;;
+  *)
+    echo "❌ Invalid NANOBOT_GITHUB_DEFAULT_VISIBILITY: $NANOBOT_GITHUB_DEFAULT_VISIBILITY_EFFECTIVE"
+    echo "Allowed: private | public"
+    exit 1
+    ;;
+esac
+
 NANOBOT_STATE_DIR_EFFECTIVE="${NANOBOT_STATE_DIR:-${PWD}/agents/.alex}"
 NANOBOT_OAUTH_DIR_EFFECTIVE="${NANOBOT_OAUTH_DIR:-${PWD}/agents/.oauth}"
 
@@ -65,6 +86,7 @@ docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli
 # Patch config with env-driven provider/channel settings.
 docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli run --rm \
   --entrypoint /bin/sh \
+  -e GH_CONFIG_DIR="/root/.nanobot/gh" \
   -e NB_PROVIDER="${NANOBOT_PROVIDER:-openai}" \
   -e NB_MODEL="${NANOBOT_MODEL:-openai/gpt-5.3-codex}" \
   -e NB_REASONING_EFFORT="${NANOBOT_REASONING_EFFORT:-low}" \
@@ -139,6 +161,33 @@ cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
     chmod 600 /root/.nanobot/config.json
   '
+
+# Bootstrap GitHub auth once (gh + PAT) if a token is provided.
+if [ "$NANOBOT_GITHUB_BOOTSTRAP_ENABLED" = true ]; then
+  docker compose "${BASE_ARGS[@]}" "${MODE_ARGS[@]}" --profile ai --profile ai-cli run --rm \
+    --entrypoint /bin/sh \
+    -e GH_CONFIG_DIR="/root/.nanobot/gh" \
+    -e NB_GITHUB_TOKEN="${NANOBOT_GITHUB_TOKEN}" \
+    -e NB_GITHUB_OWNER="${NANOBOT_GITHUB_OWNER_EFFECTIVE}" \
+    -e NB_GITHUB_VISIBILITY="${NANOBOT_GITHUB_DEFAULT_VISIBILITY_EFFECTIVE}" \
+    nanobot-cli -lc '
+      set -eu
+      mkdir -p "${GH_CONFIG_DIR:-/root/.nanobot/gh}"
+      chmod 700 "${GH_CONFIG_DIR:-/root/.nanobot/gh}"
+
+      if ! command -v gh >/dev/null 2>&1; then
+        echo "❌ GitHub CLI (gh) not found in nanobot image."
+        exit 1
+      fi
+
+      if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+        printf "%s" "$NB_GITHUB_TOKEN" | gh auth login --hostname github.com --with-token >/dev/null
+      fi
+
+      gh auth status --hostname github.com >/dev/null 2>&1
+      echo "✅ GitHub auth ready (owner=${NB_GITHUB_OWNER}, visibility=${NB_GITHUB_VISIBILITY})"
+    '
+fi
 
 # Sync Alex workspace markdown templates from repo into live NanoBot workspace.
 # This intentionally overwrites managed files for deterministic behavior.

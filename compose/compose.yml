@@ -22,6 +22,10 @@ x-nanobot-common: &nanobot-common
   build:
     context: ../external/nanobot
     dockerfile: Dockerfile
+  environment:
+    GH_CONFIG_DIR: /root/.nanobot/gh
+    NANOBOT_GITHUB_OWNER: ${NANOBOT_GITHUB_OWNER:-celerinc}
+    NANOBOT_GITHUB_DEFAULT_VISIBILITY: ${NANOBOT_GITHUB_DEFAULT_VISIBILITY:-private}
   volumes:
     - ${NANOBOT_STATE_DIR:-../agents/.alex}:/root/.nanobot
     - ${NANOBOT_OAUTH_DIR:-../agents/.oauth}:/root/.local/share/oauth-cli-kit
