@@ -12,7 +12,7 @@
 #  ↓
 # Caddy sees remote_ip=172.18.0.5
 #  ↓
-# plane, n8n
+# plane, twenty, n8n
 
 # When Docker creates a default bridge network,
 # it allocates a private container subnet
@@ -66,7 +66,7 @@ plane.{$DOMAIN} {
 # -------------------------
 s3.{$DOMAIN} {
   import vpn_only
-  reverse_proxy plane-minio:9000
+  reverse_proxy minio:9000
 }
 
 # -------------------------
@@ -75,6 +75,20 @@ s3.{$DOMAIN} {
 n8n.{$DOMAIN} {
   import vpn_only
   reverse_proxy n8n:5678
+}
+
+# -------------------------
+# Twenty (CRM)
+# -------------------------
+twenty.{$DOMAIN} {
+  import vpn_only
+
+  log {
+    output file /var/log/twenty-access.log
+    format json
+  }
+
+  reverse_proxy twenty-server:3000
 }
 
 # -------------------------

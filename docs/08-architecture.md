@@ -16,8 +16,17 @@ StartupStack runs a zero-trust internal tool stack on a standard VPS.
 
 3. Application Containers:
    - Plane: web/API/worker architecture with Postgres/Redis/MinIO.
+   - Twenty: CRM service with Postgres/Redis and S3-compatible object storage.
    - n8n: workflow automation engine.
    - NanoBot (optional): AI gateway + CLI, Slack-first integration.
+
+## Storage Model
+
+- One shared MinIO service is used for object storage.
+- Isolation is done by bucket:
+  - `plane` for Plane
+  - `twenty` for Twenty
+- This allows app-level separation while keeping infrastructure simpler and backups centralized.
 
 ## Data Flow
 

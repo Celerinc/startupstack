@@ -20,6 +20,7 @@ Create `A` records pointing to your VPS IP:
 | :--- | :--- | :--- | :--- |
 | `A` | `hs` | `<VPS_IP>` | Headscale (VPN Controller) |
 | `A` | `plane` | `<VPS_IP>` | Plane |
+| `A` | `twenty` | `<VPS_IP>` | Twenty CRM |
 | `A` | `n8n` | `<VPS_IP>` | n8n |
 | `A` | `s3` | `<VPS_IP>` | MinIO |
 | `A` | `*` | `<VPS_IP>` | Optional wildcard |

@@ -7,7 +7,11 @@ networks:
 volumes:
   # Plane
   plane_pg_data:
+  # Shared MinIO object storage
   plane_minio_data:
+  # Twenty
+  twenty_pg_data:
+  twenty_server_local_data:
   # n8n
   n8n_data:
   # Caddy
@@ -90,7 +94,7 @@ services:
     networks: [internal]
     restart: unless-stopped
 
-  plane-minio:
+  minio:
     image: minio/minio:RELEASE.2025-01-20T14-49-07Z
     command: server /data --console-address ":9001"
     environment:
@@ -139,7 +143,7 @@ services:
       CSRF_TRUSTED_ORIGINS: ${PLANE_WEB_URL}
       CORS_ALLOWED_ORIGINS: ${PLANE_WEB_URL}
       SECURE_PROXY_SSL_HEADER: HTTP_X_FORWARDED_PROTO,https
-    depends_on: [plane-db, plane-redis, plane-minio]
+    depends_on: [plane-db, plane-redis, minio]
     networks: [internal]
     restart: unless-stopped
 
@@ -154,7 +158,7 @@ services:
       PLANE_BUCKET: ${PLANE_BUCKET}
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+      AWS_S3_ENDPOINT_URL: http://minio:9000
       AWS_STORAGE_BUCKET_NAME: ${PLANE_BUCKET}
       AWS_S3_BUCKET_NAME: ${PLANE_BUCKET}
       AWS_S3_REGION_NAME: us-east-1
@@ -216,6 +220,98 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    networks: [internal]
+    restart: unless-stopped
+
+  # -----------------
+  # TWENTY (CRM)
+  # -----------------
+  twenty-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${TWENTY_DB_NAME}
+      POSTGRES_USER: ${TWENTY_DB_USER}
+      POSTGRES_PASSWORD: ${TWENTY_DB_PASSWORD}
+    volumes:
+      - twenty_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TWENTY_DB_USER} -h localhost -d ${TWENTY_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    restart: unless-stopped
+
+  twenty-redis:
+    image: redis:7
+    command: ["--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    restart: unless-stopped
+
+  twenty-server:
+    image: twentycrm/twenty:${TWENTY_VERSION}
+    environment:
+      NODE_PORT: 3000
+      PG_DATABASE_URL: postgres://${TWENTY_DB_USER}:${TWENTY_DB_PASSWORD}@twenty-db:5432/${TWENTY_DB_NAME}
+      REDIS_URL: redis://twenty-redis:6379
+      SERVER_URL: ${TWENTY_SERVER_URL}
+      APP_SECRET: ${TWENTY_APP_SECRET}
+      STORAGE_TYPE: s3
+      STORAGE_S3_REGION: us-east-1
+      STORAGE_S3_NAME: twenty
+      STORAGE_S3_ENDPOINT: http://minio:9000
+      STORAGE_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      DISABLE_DB_MIGRATIONS: ${TWENTY_DISABLE_DB_MIGRATIONS}
+      DISABLE_CRON_JOBS_REGISTRATION: ${TWENTY_DISABLE_CRON_JOBS_REGISTRATION}
+      IS_CONFIG_VARIABLES_IN_DB_ENABLED: ${TWENTY_IS_CONFIG_VARIABLES_IN_DB_ENABLED}
+      IS_MULTIWORKSPACE_ENABLED: ${TWENTY_IS_MULTIWORKSPACE_ENABLED}
+    volumes:
+      - twenty_server_local_data:/app/packages/twenty-server/.local-storage
+    depends_on:
+      - twenty-db
+      - twenty-redis
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:3000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+    restart: unless-stopped
+
+  twenty-worker:
+    image: twentycrm/twenty:${TWENTY_VERSION}
+    command: ["yarn", "worker:prod"]
+    environment:
+      PG_DATABASE_URL: postgres://${TWENTY_DB_USER}:${TWENTY_DB_PASSWORD}@twenty-db:5432/${TWENTY_DB_NAME}
+      REDIS_URL: redis://twenty-redis:6379
+      SERVER_URL: ${TWENTY_SERVER_URL}
+      APP_SECRET: ${TWENTY_APP_SECRET}
+      STORAGE_TYPE: s3
+      STORAGE_S3_REGION: us-east-1
+      STORAGE_S3_NAME: twenty
+      STORAGE_S3_ENDPOINT: http://minio:9000
+      STORAGE_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+      IS_CONFIG_VARIABLES_IN_DB_ENABLED: ${TWENTY_IS_CONFIG_VARIABLES_IN_DB_ENABLED}
+      IS_MULTIWORKSPACE_ENABLED: ${TWENTY_IS_MULTIWORKSPACE_ENABLED}
+    volumes:
+      - twenty_server_local_data:/app/packages/twenty-server/.local-storage
+    depends_on:
+      - twenty-db
+      - twenty-redis
+      - twenty-server
     networks: [internal]
     restart: unless-stopped
 

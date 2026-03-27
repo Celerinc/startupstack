@@ -47,4 +47,6 @@ else
   exit 1
 fi
 
+./scripts/minio-reconcile "$MODE"
+
 echo "✅ StartupStack is up"

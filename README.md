@@ -19,6 +19,7 @@ This repository provides infrastructure-only (Docker Compose + Config). It orche
 | Service | Purpose | Database / Storage |
 | :--- | :--- | :--- |
 | **Plane** | Project & Issue Management | PostgreSQL, Redis, MinIO |
+| **Twenty** | CRM | PostgreSQL, Redis, MinIO (bucket isolated) |
 | **n8n** | Automations & Workflow Automation | SQLite (default) or Postgres |
 | **NanoBot (optional)** | AI company assistant (Slack-first) | `NANOBOT_STATE_DIR` + `NANOBOT_OAUTH_DIR` |
 | **Headscale** | Private Mesh VPN Controller | SQLite / Embedded |
@@ -41,6 +42,7 @@ graph TD
 
     subgraph "Internal Docker Network"
         Caddy -->|Proxy| Plane
+        Caddy -->|Proxy| Twenty
         Caddy -->|Proxy| n8n
         Caddy -->|Proxy| Headplane
         NanoBot[NanoBot Gateway]
@@ -48,6 +50,9 @@ graph TD
         Plane -.-> Postgres
         Plane -.-> Redis
         Plane -.-> MinIO
+        Twenty -.-> Postgres
+        Twenty -.-> Redis
+        Twenty -.-> MinIO
         NanoBot -.-> Slack
     end
 
@@ -60,9 +65,16 @@ graph TD
 
 ### Security Model
 1. Public exposure: only Headscale control-plane traffic is publicly reachable.
-2. Private access: Plane and n8n stay behind VPN access.
+2. Private access: Plane, Twenty, and n8n stay behind VPN access.
 3. Authentication: access is enforced by Tailnet membership.
 4. NanoBot (Slack mode): outbound-only integration, no public inbound NanoBot route required.
+
+### Storage Model
+- Plane and Twenty share one MinIO service (`minio`).
+- Bucket isolation is enforced: Plane uses `plane`, Twenty uses `twenty`.
+- Twenty currently uses the same MinIO credentials as Plane (`MINIO_ROOT_*`) for simpler operations.
+- Existing Plane object data remains untouched as long as `PLANE_BUCKET=plane` is unchanged.
+- The canonical host data path is `/data/minio`.
 
 ---
 
@@ -112,6 +124,7 @@ startupstack/
    ```
 5. Access services:
    - Plane: http://localhost:8080
+   - Twenty: http://localhost:3002
    - n8n: http://localhost:5678
    - MinIO Console: http://localhost:9001
 
@@ -133,6 +146,7 @@ NanoBot state and OAuth paths are configurable via:
 - Recommended DNS:
   - `hs.example.com`
   - `plane.example.com`
+  - `twenty.example.com`
   - `n8n.example.com`
   - `s3.example.com`
 
@@ -173,6 +187,7 @@ Codex-oriented defaults are supported through env vars:
   docker compose -f compose/compose.yml logs -f plane-api
   ```
 - Data persistence: `/data` on the host.
+- Shared object storage: Plane and Twenty use the same MinIO instance with separate buckets.
 - NanoBot persistence: `NANOBOT_STATE_DIR` (state/workspace) and `NANOBOT_OAUTH_DIR` (shared OAuth sessions).
 - If Slack logs show `missing_scope` for reactions, add `reactions:write` in your Slack bot token scopes.
 
@@ -180,7 +195,7 @@ Codex-oriented defaults are supported through env vars:
 
 ## Roadmap
 
-- [ ] CRM integration (for example Twenty)
+- [x] CRM integration (Twenty)
 - [ ] ClickHouse analytics profile
 - [ ] Monitoring stack (Prometheus/Grafana)
 

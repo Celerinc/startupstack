@@ -13,10 +13,11 @@ docker network inspect startupstack_internal --format '{{json .IPAM.Config}}'
 docker network inspect startupstack_edge --format '{{json .IPAM.Config}}' || true
 echo
 
-echo "=== Caddy / Plane / Headscale IPs ==="
+echo "=== Caddy / Plane / Twenty / Headscale IPs ==="
 docker inspect -f '{{ .Name }} => {{range.NetworkSettings.Networks}}{{.NetworkID}} {{.IPAddress}}{{end}}' \
   startupstack-caddy-1 \
   startupstack-plane-proxy-1 \
+  startupstack-twenty-server-1 \
   startupstack-headscale-1 2>/dev/null || true
 echo
 
@@ -54,6 +55,15 @@ dig +short plane.${DOMAIN} @100.100.100.100 || true
 curl -vk https://plane.${DOMAIN}/vpn-test || true
 echo
 
+echo "=== twenty.${DOMAIN} from VPS ==="
+dig +short twenty.${DOMAIN} @100.100.100.100 || true
+curl -vk https://twenty.${DOMAIN}/ || true
+echo
+
 echo "=== Caddy plane-access log (last 20) ==="
 docker exec startupstack-caddy-1 sh -c 'tail -n 20 /var/log/plane-access.log' || true
+echo
+
+echo "=== Caddy twenty-access log (last 20) ==="
+docker exec startupstack-caddy-1 sh -c 'tail -n 20 /var/log/twenty-access.log' || true
 echo

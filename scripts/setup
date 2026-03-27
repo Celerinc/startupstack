@@ -25,11 +25,14 @@ if ! groups | grep -q docker; then
   sudo usermod -aG docker "$USER"
 fi
 
+MINIO_DIR="/data/minio"
+
 # 4. Create persistent data directories
 echo "Creating /data directories..."
 sudo mkdir -p \
   /data/plane/postgres \
-  /data/plane/minio \
+  /data/minio \
+  /data/twenty/postgres \
   /data/n8n \
   "${HOME_DIR}/agents/.alex" \
   "${HOME_DIR}/agents/.oauth" \
@@ -48,8 +51,12 @@ sudo chown -R 999:999 /data/plane/postgres
 sudo chmod -R 700 /data/plane/postgres
 
 # MinIO
-sudo chown -R root:root /data/plane/minio
-sudo chmod -R 775 /data/plane/minio
+sudo chown -R root:root /data/minio
+sudo chmod -R 775 /data/minio
+
+# Twenty Postgres
+sudo chown -R 999:999 /data/twenty/postgres
+sudo chmod -R 700 /data/twenty/postgres
 
 # n8n
 sudo chown -R 1000:1000 /data/n8n
@@ -73,6 +80,7 @@ chmod +x \
   scripts/firewall-lockdown \
   scripts/firewall-rules \
   scripts/join-tailnet \
+  scripts/minio-reconcile \
   scripts/nanobot-cli \
   scripts/nanobot-init
 

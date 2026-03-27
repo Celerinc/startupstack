@@ -5,7 +5,7 @@ services:
     ports:
       - "8080:80"
 
-  plane-minio:
+  minio:
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -13,6 +13,10 @@ services:
   n8n:
     ports:
       - "5678:5678"
+
+  twenty-server:
+    ports:
+      - "3002:3000"
 
   # Optional: Expose Headplane UI locally for inspection
   # headplane:

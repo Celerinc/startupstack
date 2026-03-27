@@ -49,12 +49,12 @@ services:
     volumes:
       - /data/plane/postgres:/var/lib/postgresql/data
 
-  plane-minio:
+  minio:
     expose:
       - "9000"
       - "9001"
     volumes:
-      - /data/plane/minio:/data
+      - /data/minio:/data
 
   # -----------------
   # N8N
@@ -64,6 +64,17 @@ services:
       - "5678"
     volumes:
       - /data/n8n:/home/node/.n8n
+
+  # -----------------
+  # TWENTY (CRM)
+  # -----------------
+  twenty-server:
+    expose:
+      - "3000"
+
+  twenty-db:
+    volumes:
+      - /data/twenty/postgres:/var/lib/postgresql/data
 
   # -----------------
   # CLICKHOUSE (later)

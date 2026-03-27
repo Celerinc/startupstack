@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-prod}" # local | prod
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ROOT_DIR}/env/.env.${MODE}"
+NETWORK_NAME="startupstack_internal"
+
+if [[ "$MODE" != "local" && "$MODE" != "prod" ]]; then
+  echo "❌ Invalid mode: $MODE"
+  echo "Usage: ./scripts/minio-reconcile [local|prod]"
+  exit 1
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "⚠️  ${ENV_FILE} not found; skipping MinIO reconciliation."
+  exit 0
+fi
+
+# shellcheck disable=SC1090
+set -a
+source "$ENV_FILE"
+set +a
+
+required_vars=(
+  MINIO_ROOT_USER
+  MINIO_ROOT_PASSWORD
+)
+
+missing=()
+for var_name in "${required_vars[@]}"; do
+  if [ -z "${!var_name:-}" ]; then
+    missing+=("$var_name")
+  fi
+done
+
+if [ "${#missing[@]}" -gt 0 ]; then
+  echo "❌ Missing required variables in ${ENV_FILE}: ${missing[*]}"
+  exit 1
+fi
+
+if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+  echo "⚠️  Docker network ${NETWORK_NAME} not found; skipping MinIO reconciliation."
+  exit 0
+fi
+
+PLANE_BUCKET_NAME="${PLANE_BUCKET:-plane}"
+TWENTY_BUCKET_NAME="twenty"
+
+run_mc() {
+  local cmd="$1"
+  docker run --rm \
+    --network "$NETWORK_NAME" \
+    --entrypoint sh \
+    -e MINIO_ROOT_USER="$MINIO_ROOT_USER" \
+    -e MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+    -e PLANE_BUCKET_NAME="$PLANE_BUCKET_NAME" \
+    -e TWENTY_BUCKET_NAME="$TWENTY_BUCKET_NAME" \
+    minio/mc:latest \
+    -ceu "$cmd"
+}
+
+echo "🔧 Reconciling MinIO buckets for Plane and Twenty..."
+
+ready=0
+for _ in $(seq 1 30); do
+  if run_mc 'mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1'; then
+    ready=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$ready" -ne 1 ]; then
+  echo "❌ MinIO did not become ready in time."
+  exit 1
+fi
+
+run_mc '
+mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
+
+mc mb --ignore-existing "local/${PLANE_BUCKET_NAME}" >/dev/null
+mc mb --ignore-existing "local/${TWENTY_BUCKET_NAME}" >/dev/null
+'
+
+echo "✅ MinIO reconciliation complete (buckets: ${PLANE_BUCKET_NAME}, ${TWENTY_BUCKET_NAME})"

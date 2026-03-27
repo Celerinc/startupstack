@@ -1,6 +1,6 @@
 # 06 - Client Access (VPN)
 
-To access your internal apps (`plane.example.com`, `n8n.example.com`), your computer must join the Tailnet.
+To access your internal apps (`plane.example.com`, `twenty.example.com`, `n8n.example.com`), your computer must join the Tailnet.
 
 ## 1. Generate an Auth Key
 
@@ -52,9 +52,11 @@ Once connected:
 3.  Access Apps:
     Open your browser and visit:
     - [https://plane.example.com](https://plane.example.com)
+    - [https://twenty.example.com](https://twenty.example.com)
     - [https://n8n.example.com](https://n8n.example.com)
 
 ## DNS Troubleshooting
 If you cannot load pages by domain name, ensure your computer is using the "MagicDNS" provided by Headscale/Tailscale.
 - On Mac: Check System Settings -> Network -> Tailscale -> DNS.
 - Verification: `dig +short plane.example.com` should return the VPS Tailscale IP (or Public IP, depending on your setup, but Access Control requires VPN).
+- Verification: `dig +short twenty.example.com` should return the VPS Tailscale IP (or Public IP, depending on your setup, but Access Control requires VPN).
